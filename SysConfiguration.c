@@ -12,6 +12,9 @@
 #include "fsl_gpio.h"
 #include "fsl_i2c.h"
 #include "I2C.h"
+#include "SPI_driver.h"
+#include "LCDNokia5110.h"
+#include "semphr.h"
 
 //////////////////**user types definitions*////////////////////////////
 typedef enum {
@@ -31,12 +34,10 @@ typedef enum {
 } PORTC_UART1_pins_t;
 
 typedef enum {
-    PTD0_RST, PTD1_CLK, PTD2_DIN, PTD3_DC
-} PORTD_SPI_pins_t;
-
-typedef enum {
     PTE24_SCL = 24, PTE25_SDA
 } PORTE_I2C0_pins_t;
+
+SemaphoreHandle_t sysMutex;
 
 //////////////////**function prototypes*////////////////////////////
 void SYSconfig_ButtonsConfiguration();
@@ -48,17 +49,24 @@ void i2c_ReleaseBus();
 //////////////////**mechanisms definitions*/////////////////////////
 void SystemConfiguration(void* args)
 {
-    /**ports A,B,C clock will be enabled, as pins from all those will be used*/
-    CLOCK_EnableClock(kCLOCK_PortA);
-    CLOCK_EnableClock(kCLOCK_PortB);
-    CLOCK_EnableClock(kCLOCK_PortC);
-    /**modules configuration*/
-    SYSconfig_ButtonsConfiguration(); /**buttons configuration*/
-    SYSconfig_SPIConfiguration(); /**SPI module configuration (including device initialization)*/
-    SYSconfig_UARTConfiguration(); /**UART module configuration*/
-    SYSconfig_I2CConfiguration(); /**I2C module configuration*/
+    sysMutex = xSemaphoreCreateBinary();
+    xSemaphoreGive(sysMutex);
+    for(;;){
+        xSemaphoreTake(sysMutex,portMAX_DELAY);
 
-    vTaskSuspend(NULL); /**the function auto suspends itself, as it won't be used again*/
+        /**ports A,B,C clock will be enabled, as pins from all those will be used*/
+        CLOCK_EnableClock(kCLOCK_PortA);
+        CLOCK_EnableClock(kCLOCK_PortB);
+        CLOCK_EnableClock(kCLOCK_PortC);
+        /**modules configuration*/
+        SYSconfig_ButtonsConfiguration(); /**buttons configuration*/
+        SYSconfig_SPIConfiguration(); /**SPI module configuration (including device initialization)*/
+        SYSconfig_UARTConfiguration(); /**UART module configuration*/
+        SYSconfig_I2CConfiguration(); /**I2C module configuration*/
+
+       //vTaskDelay(portMAX_DELAY);
+       // vTaskSuspend(NULL); /**the function auto suspends itself, as it won't be used again*/
+    }
 }
 
 void SYSconfig_ButtonsConfiguration()
@@ -85,7 +93,9 @@ void SYSconfig_ButtonsConfiguration()
 
 void SYSconfig_SPIConfiguration()
 {
-
+    SPI_configuration();
+    LCDNokia_init(); /*! Configuration function for the LCD */
+    LCDNokia_clear();/*! It clears the information printed in the LCD*/
 }
 
 void SYSconfig_UARTConfiguration()
@@ -115,7 +125,7 @@ void SYSconfig_I2CConfiguration()
                                    NULL);
 }
 
-/////////////**Bug fixing functions provided by NXP*///////////////
+////////////**I2C Bug fixing functions provided by NXP*/////////////
 static void i2c_release_bus_delay(void)
 {
     uint32_t i = 0;
