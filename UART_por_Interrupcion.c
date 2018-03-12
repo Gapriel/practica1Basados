@@ -47,10 +47,8 @@
 #define DEMO_UART_CLKSRC UART0_CLK_SRC
 #define DEMO_UART_CLK_FREQ CLOCK_GetFreq(UART0_CLK_SRC)
 #define ECHO_BUFFER_LENGTH 1
-#define txBufferFull_or_Empty (1 << 0)
-#define rxBufferFull_or_Empty (1 << 1)
-#define txOnOffGoing (1 << 2)
-#define rxOnOffGoing (1 << 3)
+#define txOnOffGoing (1 << 1)
+#define rxOnOffGoing (1 << 2)
 /*******************************************************************************
  * Prototypes
  ******************************************************************************/
@@ -89,18 +87,15 @@ void UART_UserCallback(UART_Type *base, uart_handle_t *handle, status_t status,
 
     if (kStatus_UART_TxIdle == status)
     {
-
-        xEventGroupClearBitsFromISR(g_UART_Events_personal,
-                                    txBufferFull_or_Empty);
-        xEventGroupClearBitsFromISR(g_UART_Events_personal, txOnOffGoing);
-
+        xEventGroupSetBitsFromISR(g_UART_Events_personal, txOnOffGoing,
+                                  &pxHigherPriorityTaskWoken);
     }
 
     if (kStatus_UART_RxIdle == status)
     {
-        xEventGroupSetBitsFromISR(g_UART_Events_personal, rxBufferFull_or_Empty,
+        xEventGroupSetBitsFromISR(g_UART_Events_personal, rxOnOffGoing,
                                   &pxHigherPriorityTaskWoken);
-        xEventGroupClearBitsFromISR(g_UART_Events_personal, rxOnOffGoing);
+
     }
     portYIELD_FROM_ISR(pxHigherPriorityTaskWoken);
 }
@@ -125,48 +120,54 @@ void uart_function() {
     UART_TransferSendNonBlocking(DEMO_UART, &g_uartHandle, &xfer);
 
     /* Wait send finished */
-    xEventGroupWaitBits(g_UART_Events_personal, txOnOffGoing, pdFALSE, pdTRUE, portMAX_DELAY);
+    xEventGroupWaitBits(g_UART_Events_personal, txOnOffGoing, pdFALSE, pdTRUE,
+                        portMAX_DELAY);
 
     /* Start to echo. */
     sendXfer.data = g_txBuffer;
     sendXfer.dataSize = ECHO_BUFFER_LENGTH;
     receiveXfer.data = g_rxBuffer;
     receiveXfer.dataSize = ECHO_BUFFER_LENGTH;
+    while (1)
+    {
+        UART_TransferReceiveNonBlocking(DEMO_UART, &g_uartHandle, &receiveXfer,
+                                        NULL);
+        xEventGroupWaitBits(g_UART_Events_personal, rxOnOffGoing,
+                            pdTRUE, pdTRUE, portMAX_DELAY);
+
+        UART_TransferSendNonBlocking(DEMO_UART, &g_uartHandle, &receiveXfer);
+        xEventGroupWaitBits(g_UART_Events_personal, txOnOffGoing, pdTRUE,
+                            pdTRUE, portMAX_DELAY);
+    }
+}
+
+
+
+void uart_send_function(){
+
+}
+
+
+void uart_receive_function(){
 
     while (1)
     {
-        /* If RX is idle and g_rxBuffer is empty, start to read data to g_rxBuffer. */
-        if ((0)
-                == (xEventGroupGetBits(g_UART_Events_personal)
-                        & (rxOnOffGoing | rxBufferFull_or_Empty)))
-        {
-            xEventGroupSetBits(g_UART_Events_personal, rxOnOffGoing);
-            UART_TransferReceiveNonBlocking(DEMO_UART, &g_uartHandle,
-                                            &receiveXfer, NULL);
-        }
+        UART_TransferReceiveNonBlocking(DEMO_UART, &g_uartHandle, &receiveXfer,
+                                        NULL);
+        xEventGroupWaitBits(g_UART_Events_personal, rxOnOffGoing,
+                            pdTRUE, pdTRUE, portMAX_DELAY);
 
-        /* If TX is idle and g_txBuffer is full, start to send data. */
-
-        if ((txBufferFull_or_Empty)
-                == (xEventGroupGetBits(g_UART_Events_personal)
-                        & (txOnOffGoing | txBufferFull_or_Empty)))
-        {
-            xEventGroupSetBits(g_UART_Events_personal, txOnOffGoing);
-            UART_TransferSendNonBlocking(DEMO_UART, &g_uartHandle, &sendXfer);
-        }
-
-        /* If g_txBuffer is empty and g_rxBuffer is full, copy g_rxBuffer to g_txBuffer. */
-        if ((rxBufferFull_or_Empty)
-                == (xEventGroupGetBits(g_UART_Events_personal)
-                        & (rxBufferFull_or_Empty | txBufferFull_or_Empty)))
-        {
-            memcpy(g_txBuffer, g_rxBuffer, ECHO_BUFFER_LENGTH);
-            xEventGroupClearBits(g_UART_Events_personal, rxBufferFull_or_Empty);
-            xEventGroupSetBits(g_UART_Events_personal, txBufferFull_or_Empty);
-        }
+      //  memcpy(g_txBuffer, g_rxBuffer, ECHO_BUFFER_LENGTH);
+        UART_TransferSendNonBlocking(DEMO_UART, &g_uartHandle, &receiveXfer);
+        xEventGroupWaitBits(g_UART_Events_personal, txOnOffGoing, pdTRUE,
+                            pdTRUE, portMAX_DELAY);
     }
-    vTaskDelay(1);
 }
+
+
+
+
+
 int main(void) {
     BOARD_InitPins();
     BOARD_BootClockRUN();
@@ -192,12 +193,8 @@ int main(void) {
     NVIC_EnableIRQ(UART0_RX_TX_IRQn);
     NVIC_SetPriority(UART0_RX_TX_IRQn, 5);
     g_UART_Events_personal = xEventGroupCreate();
-    xTaskCreate(uart_function, "UART_TASK", configMINIMAL_STACK_SIZE + 100,
-                NULL, configMAX_PRIORITIES -2, NULL);
+    xTaskCreate(uart_function, "UART_TASK", configMINIMAL_STACK_SIZE + 300,
+    NULL,
+                configMAX_PRIORITIES - 2, NULL);
     vTaskStartScheduler();
-    while (1)
-    {
-
-    }
-
 }
