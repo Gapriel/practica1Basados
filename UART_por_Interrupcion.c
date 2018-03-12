@@ -63,8 +63,12 @@ void UART_UserCallback(UART_Type *base, uart_handle_t *handle, status_t status,
  * Variables
  ******************************************************************************/
 uart_handle_t g_uartHandle;
-
+uart_config_t config;
+uart_transfer_t xfer;
+uart_transfer_t sendXfer;
+uart_transfer_t receiveXfer;
 EventGroupHandle_t g_UART_Events_personal;
+
 uint8_t g_tipString[] =
         "Uart interrupt example\r\nBoard receives 1 characters then sends them out\r\nNow please input:\r\n";
 
@@ -80,53 +84,28 @@ extern void UART0_DriverIRQHandler(void);
 void UART_UserCallback(UART_Type *base, uart_handle_t *handle, status_t status,
                        void *userData) {
     userData = userData;
+    BaseType_t pxHigherPriorityTaskWoken;
+    pxHigherPriorityTaskWoken = pdFALSE;
 
     if (kStatus_UART_TxIdle == status)
     {
-        xEventGroupClearBits(g_UART_Events_personal, txBufferFull_or_Empty);
-        xEventGroupClearBits(g_UART_Events_personal, txOnOffGoing);
+
+        xEventGroupClearBitsFromISR(g_UART_Events_personal,
+                                    txBufferFull_or_Empty);
+        xEventGroupClearBitsFromISR(g_UART_Events_personal, txOnOffGoing);
 
     }
 
     if (kStatus_UART_RxIdle == status)
     {
-        xEventGroupSetBits(g_UART_Events_personal, rxBufferFull_or_Empty);
-        xEventGroupClearBits(g_UART_Events_personal, rxOnOffGoing);
-
+        xEventGroupSetBitsFromISR(g_UART_Events_personal, rxBufferFull_or_Empty,
+                                  &pxHigherPriorityTaskWoken);
+        xEventGroupClearBitsFromISR(g_UART_Events_personal, rxOnOffGoing);
     }
+    portYIELD_FROM_ISR(pxHigherPriorityTaskWoken);
 }
 
-/*!
- * @brief Main function
- */
-int main(void) {
-    uart_config_t config;
-    uart_transfer_t xfer;
-    uart_transfer_t sendXfer;
-    uart_transfer_t receiveXfer;
-    g_UART_Events_personal = xEventGroupCreate();
-    BOARD_InitPins();
-    BOARD_BootClockRUN();
-
-    BOARD_InitDebugConsole();
-
-    UART_GetDefaultConfig(&config);
-
-    config.baudRate_Bps = 115200U;
-    /* config.parityMode = kUART_ParityDisabled;
-     * config.stopBitCount = kUART_OneStopBit;
-     * config.txFifoWatermark = 0;
-     * config.rxFifoWatermark = 1;
-     * config.enableTx = false;
-     * config.enableRx = false;
-     */
-    config.enableTx = true;
-    config.enableRx = true;
-
-    UART_Init(DEMO_UART, &config, DEMO_UART_CLK_FREQ);
-    UART_TransferCreateHandle(DEMO_UART, &g_uartHandle, UART_UserCallback,
-    NULL);
-
+void uart_function() {
     /*******************************************************************************
      * Codigo para limpiar la terminal y reiniciar el cursor.
      ******************************************************************************/
@@ -135,23 +114,6 @@ int main(void) {
     xfer.dataSize = sizeof(limpiar) - 1;
     xEventGroupSetBits(g_UART_Events_personal, txOnOffGoing);
     UART_TransferSendNonBlocking(DEMO_UART, &g_uartHandle, &xfer);
-
-    /* Wait send finished */
-    while (txOnOffGoing
-            == (xEventGroupGetBits(g_UART_Events_personal) & (txOnOffGoing)))
-    {
-    }
-    uint8_t reiniciar_consola[] = "\033[1;1H";
-    xfer.data = reiniciar_consola;
-    xfer.dataSize = sizeof(reiniciar_consola) - 1;
-    xEventGroupSetBits(g_UART_Events_personal, txOnOffGoing);
-    UART_TransferSendNonBlocking(DEMO_UART, &g_uartHandle, &xfer);
-
-    /* Wait send finished */
-    while (txOnOffGoing
-            == (xEventGroupGetBits(g_UART_Events_personal) & (txOnOffGoing)))
-    {
-    }
 
     /*******************************************************************************
      * Code
@@ -163,10 +125,7 @@ int main(void) {
     UART_TransferSendNonBlocking(DEMO_UART, &g_uartHandle, &xfer);
 
     /* Wait send finished */
-    while (txOnOffGoing
-            == (xEventGroupGetBits(g_UART_Events_personal) & (txOnOffGoing)))
-    {
-    }
+    xEventGroupWaitBits(g_UART_Events_personal, txOnOffGoing, pdFALSE, pdTRUE, portMAX_DELAY);
 
     /* Start to echo. */
     sendXfer.data = g_txBuffer;
@@ -206,4 +165,39 @@ int main(void) {
             xEventGroupSetBits(g_UART_Events_personal, txBufferFull_or_Empty);
         }
     }
+    vTaskDelay(1);
+}
+int main(void) {
+    BOARD_InitPins();
+    BOARD_BootClockRUN();
+    BOARD_InitDebugConsole();
+
+    UART_GetDefaultConfig(&config);
+    PRINTF("PRUEBA");
+    config.baudRate_Bps = BOARD_DEBUG_UART_BAUDRATE;
+    /* config.parityMode = kUART_ParityDisabled;
+     * config.stopBitCount = kUART_OneStopBit;
+     * config.txFifoWatermark = 0;
+     * config.rxFifoWatermark = 1;
+     * config.enableTx = false;
+     * config.enableRx = false;
+     */
+    config.enableTx = true;
+    config.enableRx = true;
+
+    UART_Init(DEMO_UART, &config, DEMO_UART_CLK_FREQ);
+    UART_TransferCreateHandle(DEMO_UART, &g_uartHandle, UART_UserCallback,
+    NULL);
+
+    NVIC_EnableIRQ(UART0_RX_TX_IRQn);
+    NVIC_SetPriority(UART0_RX_TX_IRQn, 5);
+    g_UART_Events_personal = xEventGroupCreate();
+    xTaskCreate(uart_function, "UART_TASK", configMINIMAL_STACK_SIZE + 100,
+                NULL, configMAX_PRIORITIES -2, NULL);
+    vTaskStartScheduler();
+    while (1)
+    {
+
+    }
+
 }
