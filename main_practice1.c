@@ -49,7 +49,6 @@
 
 #define STACK_SIZE 110
 
-
 void dummy_task1(void* args)
 {
     TickType_t xLastWakeTime;
@@ -59,8 +58,8 @@ void dummy_task1(void* args)
     {
         PRINTF("IN TASK 1: %i +++++++++++++++\r\n", counter);
         counter++;
-        //vTaskDelay(pdMS_TO_TICKS(2000));
-        vTaskDelayUntil(&xLastWakeTime, xPeriod);
+        vTaskDelay(pdMS_TO_TICKS(2000));
+        // vTaskDelayUntil(&xLastWakeTime, xPeriod);
     }
 }
 
@@ -73,8 +72,8 @@ void dummy_task2(void* args)
     {
         PRINTF("IN TASK 2: %i ***************\r\n", counter);
         counter++;
-        //vTaskDelay(pdMS_TO_TICKS(1000));
-        vTaskDelayUntil(&xLastWakeTime, xPeriod);
+        vTaskDelay(pdMS_TO_TICKS(1000));
+        //    vTaskDelayUntil(&xLastWakeTime, xPeriod);
     }
 }
 
@@ -87,28 +86,34 @@ void dummy_task3(void* args)
     {
         PRINTF("IN TASK 3: %i ---------------\r\n", counter);
         counter++;
-        //vTaskDelay(pdMS_TO_TICKS(4000));
-        vTaskDelayUntil(&xLastWakeTime, xPeriod);
+        vTaskDelay(pdMS_TO_TICKS(4000));
+        //vTaskDelayUntil(&xLastWakeTime, xPeriod);
     }
 }
 
-void probandoLOL(void* args){
+void probandoLOL(void* args)
+{
     static uint8_t string1[] = "hola"; /*! String to be printed in the LCD*/
-    for(;;){
+    for (;;)
+    {
         LCDNokia_sendString(string1);
-        vTaskDelay(10000);
+        vTaskDelay(pdMS_TO_TICKS(5000));
     }
 }
 
 int main(void)
 {
+    BOARD_InitPins();
+    BOARD_BootClockRUN();
+    BOARD_InitDebugConsole();
     xTaskCreate(SystemConfiguration, "System initial configuration", STACK_SIZE,
-                (void*) NULL, 3, NULL); /**System configuration task creation*/
-    xTaskCreate(dummy_task1, "tarea 1", STACK_SIZE, (void*)NULL, 1, NULL);
-    xTaskCreate(dummy_task2, "tarea 2", STACK_SIZE, (void*)NULL, 1, NULL);
-    xTaskCreate(dummy_task3, "tarea 3", STACK_SIZE, (void*)NULL, 1, NULL);
-    xTaskCreate(probandoLOL, "prueba", STACK_SIZE, (void*)NULL, 2, NULL);
+                (void*) NULL, 4, NULL); /**System configuration task creation*/
+    xTaskCreate(dummy_task1, "tarea 1", STACK_SIZE, (void*) NULL, 1, NULL);
+    xTaskCreate(dummy_task2, "tarea 2", STACK_SIZE, (void*) NULL, 3, NULL);
+    xTaskCreate(dummy_task3, "tarea 3", STACK_SIZE, (void*) NULL, 1, NULL);
+    xTaskCreate(probandoLOL, "prueba", STACK_SIZE, (void*) NULL, 2, NULL);
     vTaskStartScheduler(); /**FREERTOS scheduler control taking*/
-    for (;;); /**practice superloop; execution doesn't reach this point*/
+    for (;;)
+        ; /**practice superloop; execution doesn't reach this point*/
     return 0;
 }

@@ -49,10 +49,10 @@ void i2c_ReleaseBus();
 //////////////////**mechanisms definitions*/////////////////////////
 void SystemConfiguration(void* args)
 {
-    sysMutex = xSemaphoreCreateBinary();
-    xSemaphoreGive(sysMutex);
+    //sysMutex = xSemaphoreCreateBinary();
+  //  xSemaphoreGive(sysMutex);
     for(;;){
-        xSemaphoreTake(sysMutex,portMAX_DELAY);
+      //  xSemaphoreTake(sysMutex,portMAX_DELAY);
 
         /**ports A,B,C clock will be enabled, as pins from all those will be used*/
         CLOCK_EnableClock(kCLOCK_PortA);
@@ -65,7 +65,7 @@ void SystemConfiguration(void* args)
         SYSconfig_I2CConfiguration(); /**I2C module configuration*/
 
        //vTaskDelay(portMAX_DELAY);
-       // vTaskSuspend(NULL); /**the function auto suspends itself, as it won't be used again*/
+        vTaskSuspend(NULL); /**the function auto suspends itself, as it won't be used again*/
     }
 }
 
