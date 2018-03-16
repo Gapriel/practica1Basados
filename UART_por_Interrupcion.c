@@ -47,8 +47,9 @@
 #define DEMO_UART_CLKSRC UART0_CLK_SRC
 #define DEMO_UART_CLK_FREQ CLOCK_GetFreq(UART0_CLK_SRC)
 #define ECHO_BUFFER_LENGTH 1
-#define txOnOffGoing (1 << 1)
-#define rxOnOffGoing (1 << 2)
+#define txOnOffGoing (1 << 0)
+#define rxOnOffGoing (1 << 1)
+#define send_event (1 << 2)
 /*******************************************************************************
  * Prototypes
  ******************************************************************************/
@@ -66,6 +67,13 @@ uart_transfer_t xfer;
 uart_transfer_t sendXfer;
 uart_transfer_t receiveXfer;
 EventGroupHandle_t g_UART_Events_personal;
+
+
+static QueueHandle_t UART_Queue;
+
+typedef struct {
+
+} uart_;
 
 uint8_t g_tipString[] =
         "Uart interrupt example\r\nBoard receives 1 characters then sends them out\r\nNow please input:\r\n";
@@ -93,7 +101,8 @@ void UART_UserCallback(UART_Type *base, uart_handle_t *handle, status_t status,
 
     if (kStatus_UART_RxIdle == status)
     {
-        xEventGroupSetBitsFromISR(g_UART_Events_personal, rxOnOffGoing,
+        xEventGroupSetBitsFromISR(g_UART_Events_personal,
+                                  rxOnOffGoing | send_event,
                                   &pxHigherPriorityTaskWoken);
 
     }
@@ -121,52 +130,47 @@ void uart_function() {
 
     /* Wait send finished */
     xEventGroupWaitBits(g_UART_Events_personal, txOnOffGoing, pdFALSE, pdTRUE,
-                        portMAX_DELAY);
+    portMAX_DELAY);
 
     /* Start to echo. */
     sendXfer.data = g_txBuffer;
     sendXfer.dataSize = ECHO_BUFFER_LENGTH;
     receiveXfer.data = g_rxBuffer;
     receiveXfer.dataSize = ECHO_BUFFER_LENGTH;
-    while (1)
-    {
-        UART_TransferReceiveNonBlocking(DEMO_UART, &g_uartHandle, &receiveXfer,
-                                        NULL);
-        xEventGroupWaitBits(g_UART_Events_personal, rxOnOffGoing,
-                            pdTRUE, pdTRUE, portMAX_DELAY);
-
-        UART_TransferSendNonBlocking(DEMO_UART, &g_uartHandle, &receiveXfer);
-        xEventGroupWaitBits(g_UART_Events_personal, txOnOffGoing, pdTRUE,
-                            pdTRUE, portMAX_DELAY);
-    }
-}
-
-
-
-void uart_send_function(){
-
-}
-
-
-void uart_receive_function(){
 
     while (1)
     {
-        UART_TransferReceiveNonBlocking(DEMO_UART, &g_uartHandle, &receiveXfer,
-                                        NULL);
-        xEventGroupWaitBits(g_UART_Events_personal, rxOnOffGoing,
-                            pdTRUE, pdTRUE, portMAX_DELAY);
-
-      //  memcpy(g_txBuffer, g_rxBuffer, ECHO_BUFFER_LENGTH);
-        UART_TransferSendNonBlocking(DEMO_UART, &g_uartHandle, &receiveXfer);
-        xEventGroupWaitBits(g_UART_Events_personal, txOnOffGoing, pdTRUE,
-                            pdTRUE, portMAX_DELAY);
+        vTaskDelay(50000);
     }
 }
 
+void uart_send_function() {
+    while (1)
+    {
 
+        xEventGroupWaitBits(g_UART_Events_personal, txOnOffGoing | send_event,
+                            pdTRUE,
+                            pdTRUE,
+                            portMAX_DELAY);
 
+        UART_TransferSendNonBlocking(DEMO_UART, &g_uartHandle, &receiveXfer);
 
+    }
+
+}
+
+void uart_receive_function() {
+
+    while (1)
+    {
+
+        UART_TransferReceiveNonBlocking(DEMO_UART, &g_uartHandle, &receiveXfer,
+        NULL);
+        xEventGroupWaitBits(g_UART_Events_personal, rxOnOffGoing,
+        pdTRUE, pdTRUE, portMAX_DELAY);
+
+    }
+}
 
 int main(void) {
     BOARD_InitPins();
@@ -174,7 +178,6 @@ int main(void) {
     BOARD_InitDebugConsole();
 
     UART_GetDefaultConfig(&config);
-    PRINTF("PRUEBA");
     config.baudRate_Bps = BOARD_DEBUG_UART_BAUDRATE;
     /* config.parityMode = kUART_ParityDisabled;
      * config.stopBitCount = kUART_OneStopBit;
@@ -193,8 +196,14 @@ int main(void) {
     NVIC_EnableIRQ(UART0_RX_TX_IRQn);
     NVIC_SetPriority(UART0_RX_TX_IRQn, 5);
     g_UART_Events_personal = xEventGroupCreate();
-    xTaskCreate(uart_function, "UART_TASK", configMINIMAL_STACK_SIZE + 300,
+    xTaskCreate(uart_function, "UART_TASK", configMINIMAL_STACK_SIZE + 100,
     NULL,
-                configMAX_PRIORITIES - 2, NULL);
+                configMAX_PRIORITIES - 1, NULL);
+
+    xTaskCreate(uart_send_function, "send", configMINIMAL_STACK_SIZE + 100,
+                NULL, configMAX_PRIORITIES - 2, NULL);
+    xTaskCreate(uart_receive_function, "receive",
+                configMINIMAL_STACK_SIZE + 100, NULL, configMAX_PRIORITIES - 3,
+                NULL);
     vTaskStartScheduler();
 }
