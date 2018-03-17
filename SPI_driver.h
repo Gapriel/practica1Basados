@@ -13,5 +13,6 @@
 
 void SPI_configuration();
 void SPI_sendOneByte(uint8_t byte);
+void probandoLOL(void* args);
 
 #endif /* SPI_DRIVER_H_ */

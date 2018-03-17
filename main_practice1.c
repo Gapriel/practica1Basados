@@ -47,7 +47,7 @@
 #include "SPI_driver.h"
 #include "LCDNokia5110.h"
 
-#define STACK_SIZE 110
+#define STACK_SIZE 150
 
 void dummy_task1(void* args)
 {
@@ -93,11 +93,17 @@ void dummy_task3(void* args)
 
 void probandoLOL(void* args)
 {
+    static count = 0;
     static uint8_t string1[] = "hola"; /*! String to be printed in the LCD*/
     for (;;)
     {
+        if(count >= 18){
+            count = 0;
+            LCDNokia_clear();
+        }
         LCDNokia_sendString(string1);
-        vTaskDelay(pdMS_TO_TICKS(5000));
+        count++;
+        vTaskDelay(pdMS_TO_TICKS(6000));
     }
 }
 
