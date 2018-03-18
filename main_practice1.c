@@ -91,22 +91,6 @@ void dummy_task3(void* args)
     }
 }
 
-void probandoLOL(void* args)
-{
-    static count = 0;
-    static uint8_t string1[] = "hola"; /*! String to be printed in the LCD*/
-    for (;;)
-    {
-        if(count >= 18){
-            count = 0;
-            LCDNokia_clear();
-        }
-        LCDNokia_sendString(string1);
-        count++;
-        vTaskDelay(pdMS_TO_TICKS(6000));
-    }
-}
-
 int main(void)
 {
     BOARD_InitPins();
@@ -117,7 +101,7 @@ int main(void)
     xTaskCreate(dummy_task1, "tarea 1", STACK_SIZE, (void*) NULL, 1, NULL);
     xTaskCreate(dummy_task2, "tarea 2", STACK_SIZE, (void*) NULL, 3, NULL);
     xTaskCreate(dummy_task3, "tarea 3", STACK_SIZE, (void*) NULL, 1, NULL);
-    xTaskCreate(probandoLOL, "prueba", STACK_SIZE, (void*) NULL, 2, NULL);
+    xTaskCreate(probandoSPI, "prueba", STACK_SIZE, (void*) NULL, 2, NULL);
     vTaskStartScheduler(); /**FREERTOS scheduler control taking*/
     for (;;)
         ; /**practice superloop; execution doesn't reach this point*/

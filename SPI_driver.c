@@ -44,7 +44,7 @@ typedef struct {
 } SPI_msg_t;
 
 
-void SPI_print_task();
+void task_SPI_print();
 /////////////////////**module callbacks*///////////////////////////////
 void DSPI_MasterUserCallback(SPI_Type *base, dspi_master_handle_t *handle,
                              status_t status, void *userData)
@@ -71,7 +71,7 @@ void SPI_configuration()
         kPORT_LowDriveStrength, kPORT_MuxAlt2, kPORT_UnlockRegister, };
     PORT_SetPinConfig(PORTD, PTD1_SCK, &config_spi);
     PORT_SetPinConfig(PORTD, PTD2_SOUT, &config_spi);
-    //SPI_queue = xQueueCreate(3, sizeof(void*)); /**IPC queue created with the size of a void pointer*/
+    SPI_queue = xQueueCreate(3, sizeof(void*)); /**IPC queue created with the size of a void pointer*/
     dspi_master_config_t masterConfig;
     DSPI_MasterGetDefaultConfig(&masterConfig);
 #if DEBUG_SPI_CONFIGURE_AS_IN_DSPS
@@ -83,7 +83,7 @@ void SPI_configuration()
     DSPI_MasterTransferCreateHandle(SPI0, &g_m_handle, DSPI_MasterUserCallback,
                                     NULL);
     NVIC_enableInterruptAndPriotity(SPI0_IRQn,5);
-   // xTaskCreate(SPI_print_task, "spi printing task", 150, (void*)NULL, 1, NULL);
+    xTaskCreate(task_SPI_print, "spi printing task", 150, (void*)NULL, 1, NULL);
 #if DEBUG_SPI_CONFIGURE_AS_IN_DSPS
     DSPI_SetFifoEnable(SPI0, false, false);
     DSPI_Enable(SPI0, true);
@@ -110,46 +110,45 @@ void SPI_sendOneByte(uint8_t byte)
 }
 
 
-//void SPI_print_task(){
-//    static SPI_msg_t *message;
-//    for(;;){
-//        xQueueReceive(SPI_queue, &message, portMAX_DELAY);
-//        if(pdTRUE == message->LCD_to_be_clear){
-//           LCDNokia_clear();
-//        }else{
-//           //uint8_t text = message->string_to_be_printed;
-//           LCDNokia_sendString(message->string_to_be_printed);
-//        }
-//        vPortFree(message);
-//        //vTaskDelay(10);
-//    }
-//
-//}
+void task_SPI_print(){
+    static SPI_msg_t *message;
+    for(;;){
+        xQueueReceive(SPI_queue, &message, portMAX_DELAY);
+        if(pdTRUE == message->LCD_to_be_clear){
+           LCDNokia_clear();
+        }else{
+           //uint8_t text = message->string_to_be_printed;
+           LCDNokia_sendString(message->string_to_be_printed);
+        }
+        vPortFree(message);
+    }
+
+}
 
 
-//void probandoLOL(void* args)
-//{
-//    static uint8_t count = 0;
-//
-//    SPI_msg_t * message;
-//    static uint8_t mensaje[] = "hola";
-//    static uint8_t vacio[] = "";
-//    for (;;)
-//    {
-//        message = pvPortMalloc(sizeof(SPI_msg_t)); /**memory is reserved for the message to be sent*/
-//        if(count >= 18){
-//            count = 0;
-//            message->LCD_to_be_clear = 1;
-//            message->string_to_be_printed[0] = "";
-//        }else{
-//            message->string_to_be_printed[0] = 'h';
-//            message->string_to_be_printed[1] = 'o';
-//            message->string_to_be_printed[2] = 'l';
-//            message->string_to_be_printed[3] = 'a';
-//            message->LCD_to_be_clear = 0;
-//            count++;
-//        }
-//        xQueueSend(SPI_queue,&message,portMAX_DELAY);
-//        vTaskDelay(pdMS_TO_TICKS(6000));
-//    }
-//}
+void probandoSPI(void* args)
+{
+    static uint8_t count = 0;
+
+    SPI_msg_t * message;
+    static uint8_t mensaje[] = "hola";
+    static uint8_t vacio[] = "";
+    for (;;)
+    {
+        message = pvPortMalloc(sizeof(SPI_msg_t)); /**memory is reserved for the message to be sent*/
+        if(count >= 18){
+            count = 0;
+            message->LCD_to_be_clear = 1;
+            message->string_to_be_printed[0] = "";
+        }else{
+            message->string_to_be_printed[0] = 'h';
+            message->string_to_be_printed[1] = 'o';
+            message->string_to_be_printed[2] = 'l';
+            message->string_to_be_printed[3] = 'a';
+            message->LCD_to_be_clear = 0;
+            count++;
+        }
+        xQueueSend(SPI_queue,&message,portMAX_DELAY);
+        vTaskDelay(pdMS_TO_TICKS(6000));
+    }
+}
