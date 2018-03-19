@@ -11,10 +11,10 @@
 #include "fsl_port.h"
 #include "fsl_gpio.h"
 #include "fsl_i2c.h"
-#include "I2C.h"
 #include "SPI_driver.h"
 #include "LCDNokia5110.h"
 #include "semphr.h"
+#include "I2C_driver.h"
 
 //////////////////**user types definitions*////////////////////////////
 typedef enum {
@@ -33,26 +33,17 @@ typedef enum {
     PTB3_RX = 3, PTB4_TX
 } PORTC_UART1_pins_t;
 
-typedef enum {
-    PTE24_SCL = 24, PTE25_SDA
-} PORTE_I2C0_pins_t;
-
-SemaphoreHandle_t sysMutex;
 
 //////////////////**function prototypes*////////////////////////////
 void SYSconfig_ButtonsConfiguration();
 void SYSconfig_SPIConfiguration();
 void SYSconfig_UARTConfiguration();
 void SYSconfig_I2CConfiguration();
-void i2c_ReleaseBus();
 
 //////////////////**mechanisms definitions*/////////////////////////
 void SystemConfiguration(void* args)
 {
-    //sysMutex = xSemaphoreCreateBinary();
-  //  xSemaphoreGive(sysMutex);
     for(;;){
-      //  xSemaphoreTake(sysMutex,portMAX_DELAY);
 
         /**ports A,B,C clock will be enabled, as pins from all those will be used*/
         CLOCK_EnableClock(kCLOCK_PortA);
@@ -60,12 +51,12 @@ void SystemConfiguration(void* args)
         CLOCK_EnableClock(kCLOCK_PortC);
         /**modules configuration*/
         SYSconfig_ButtonsConfiguration(); /**buttons configuration*/
-        SYSconfig_SPIConfiguration(); /**SPI module configuration (including device initialization)*/
+      //  SYSconfig_SPIConfiguration(); /**SPI module configuration (including device initialization)*/
         SYSconfig_UARTConfiguration(); /**UART module configuration*/
         SYSconfig_I2CConfiguration(); /**I2C module configuration*/
 
-       //vTaskDelay(portMAX_DELAY);
         vTaskSuspend(NULL); /**the function auto suspends itself, as it won't be used again*/
+        //vTaskDelete(NULL);
     }
 }
 
@@ -105,79 +96,62 @@ void SYSconfig_UARTConfiguration()
 
 void SYSconfig_I2CConfiguration()
 {
-    i2c_ReleaseBus(); /**bug fixing function provided by NXP*/
-    /**I2C_0 and PORTE clock enabling, as those are the modules required for the I2C operation*/
-    CLOCK_EnableClock(kCLOCK_I2c0);
-    CLOCK_EnableClock(kCLOCK_PortE);
-    /**I2C module configuration*/
-    port_pin_config_t config_i2c = { kPORT_PullDisable, kPORT_SlowSlewRate,
-        kPORT_PassiveFilterDisable, kPORT_OpenDrainDisable,
-        kPORT_LowDriveStrength, kPORT_MuxAlt5, kPORT_UnlockRegister };
-    PORT_SetPinConfig(PORTE, PTE24_SCL, &config_i2c); /**I2C_0 SCL configured*/
-    PORT_SetPinConfig(PORTE, PTE25_SDA, &config_i2c); /**I2C_0 SDA configured*/
-    /**I2C_0 master configuration and initialization*/
-    i2c_master_config_t masterConfig;
-    I2C_MasterGetDefaultConfig(&masterConfig);
-    I2C_MasterInit(I2C0, &masterConfig, CLOCK_GetFreq(kCLOCK_BusClk));
-    /**I2C_0 master handle creation*/
-    i2c_master_handle_t g_m_handle;
-    I2C_MasterTransferCreateHandle(I2C0, &g_m_handle, i2c_master_callback,
-                                   NULL);
+    I2C_configuration();
 }
 
 ////////////**I2C Bug fixing functions provided by NXP*/////////////
-static void i2c_release_bus_delay(void)
-{
-    uint32_t i = 0;
-    for (i = 0; i < 100; i++)
-    {
-        __NOP();
-    }
-}
-void i2c_ReleaseBus()
-{
-    uint8_t i = 0;
-    gpio_pin_config_t pin_config;
-    port_pin_config_t i2c_pin_config = { 0 };
-
-    /* Config pin mux as gpio */
-    i2c_pin_config.pullSelect = kPORT_PullUp;
-    i2c_pin_config.mux = kPORT_MuxAsGpio;
-
-    pin_config.pinDirection = kGPIO_DigitalOutput;
-    pin_config.outputLogic = 1U;
-    CLOCK_EnableClock(kCLOCK_PortE);
-    PORT_SetPinConfig(PORTE, 24, &i2c_pin_config);
-    PORT_SetPinConfig(PORTE, 25, &i2c_pin_config);
-
-    GPIO_PinInit(GPIOE, 24, &pin_config);
-    GPIO_PinInit(GPIOE, 25, &pin_config);
-
-    GPIO_PinWrite(GPIOE, 25, 0U);
-    i2c_release_bus_delay();
-
-    for (i = 0; i < 9; i++)
-    {
-        GPIO_PinWrite(GPIOE, 24, 0U);
-        i2c_release_bus_delay();
-
-        GPIO_PinWrite(GPIOE, 25, 1U);
-        i2c_release_bus_delay();
-
-        GPIO_PinWrite(GPIOE, 24, 1U);
-        i2c_release_bus_delay();
-        i2c_release_bus_delay();
-    }
-
-    GPIO_PinWrite(GPIOE, 24, 0U);
-    i2c_release_bus_delay();
-
-    GPIO_PinWrite(GPIOE, 25, 0U);
-    i2c_release_bus_delay();
-
-    GPIO_PinWrite(GPIOE, 24, 1U);
-    i2c_release_bus_delay();
-
-    GPIO_PinWrite(GPIOE, 25, 1U);
-    i2c_release_bus_delay();
-}
+//static void i2c_release_bus_delay(void)
+//{
+//    uint32_t i = 0;
+//    for (i = 0; i < 100; i++)
+//    {
+//        __NOP();
+//    }
+//}
+//void i2c_ReleaseBus()
+//{
+//    uint8_t i = 0;
+//    gpio_pin_config_t pin_config;
+//    port_pin_config_t i2c_pin_config = { 0 };
+//
+//    /* Config pin mux as gpio */
+//    i2c_pin_config.pullSelect = kPORT_PullUp;
+//    i2c_pin_config.mux = kPORT_MuxAsGpio;
+//
+//    pin_config.pinDirection = kGPIO_DigitalOutput;
+//    pin_config.outputLogic = 1U;
+//    CLOCK_EnableClock(kCLOCK_PortE);
+//    PORT_SetPinConfig(PORTE, 24, &i2c_pin_config);
+//    PORT_SetPinConfig(PORTE, 25, &i2c_pin_config);
+//
+//    GPIO_PinInit(GPIOE, 24, &pin_config);
+//    GPIO_PinInit(GPIOE, 25, &pin_config);
+//
+//    GPIO_PinWrite(GPIOE, 25, 0U);
+//    i2c_release_bus_delay();
+//
+//    for (i = 0; i < 9; i++)
+//    {
+//        GPIO_PinWrite(GPIOE, 24, 0U);
+//        i2c_release_bus_delay();
+//
+//        GPIO_PinWrite(GPIOE, 25, 1U);
+//        i2c_release_bus_delay();
+//
+//        GPIO_PinWrite(GPIOE, 24, 1U);
+//        i2c_release_bus_delay();
+//        i2c_release_bus_delay();
+//    }
+//
+//    GPIO_PinWrite(GPIOE, 24, 0U);
+//    i2c_release_bus_delay();
+//
+//    GPIO_PinWrite(GPIOE, 25, 0U);
+//    i2c_release_bus_delay();
+//
+//    GPIO_PinWrite(GPIOE, 24, 1U);
+//    i2c_release_bus_delay();
+//
+//    GPIO_PinWrite(GPIOE, 25, 1U);
+//    i2c_release_bus_delay();
+//}

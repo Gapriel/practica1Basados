@@ -23,11 +23,11 @@
 #define STRING_MAX_LENGTH 72
 
 //////////////**OS SPI resources declarations*//////////////////////////
-dspi_master_handle_t g_m_handle;
-dspi_transfer_t masterXfer;
+dspi_master_handle_t g_m_handle_I2C;
+dspi_transfer_t masterXfer_I2C;
 SemaphoreHandle_t g_SPI_mutex;
 EventGroupHandle_t g_SPI_events;
-static volatile QueueHandle_t SPI_queue;
+QueueHandle_t SPI_queue;
 
 //////////////////**user types definitions*////////////////////////////
 typedef enum {
@@ -64,6 +64,7 @@ void SPI_configuration()
 {
     g_SPI_mutex = xSemaphoreCreateMutex();      //SPI0 MUTEX creation
     g_SPI_events = xEventGroupCreate();        //SPI0 event group bits creation
+    SPI_queue = xQueueCreate(3, sizeof(void*)); /**IPC queue created with the size of a void pointer*/
     CLOCK_EnableClock(kCLOCK_PortD);
     CLOCK_EnableClock(kCLOCK_Spi0);
     port_pin_config_t config_spi = { kPORT_PullDisable, kPORT_SlowSlewRate,
@@ -71,7 +72,6 @@ void SPI_configuration()
         kPORT_LowDriveStrength, kPORT_MuxAlt2, kPORT_UnlockRegister, };
     PORT_SetPinConfig(PORTD, PTD1_SCK, &config_spi);
     PORT_SetPinConfig(PORTD, PTD2_SOUT, &config_spi);
-    SPI_queue = xQueueCreate(3, sizeof(void*)); /**IPC queue created with the size of a void pointer*/
     dspi_master_config_t masterConfig;
     DSPI_MasterGetDefaultConfig(&masterConfig);
 #if DEBUG_SPI_CONFIGURE_AS_IN_DSPS
@@ -80,9 +80,9 @@ void SPI_configuration()
 #endif
     DSPI_MasterInit(SPI0, &masterConfig, CLOCK_GetBusClkFreq());
     NVIC_enableInterruptAndPriotity(SPI0_IRQn, 7);
-    DSPI_MasterTransferCreateHandle(SPI0, &g_m_handle, DSPI_MasterUserCallback,
+    DSPI_MasterTransferCreateHandle(SPI0, &g_m_handle_I2C, DSPI_MasterUserCallback,
                                     NULL);
-    NVIC_enableInterruptAndPriotity(SPI0_IRQn,5);
+    //NVIC_enableInterruptAndPriotity(SPI0_IRQn,5);
     xTaskCreate(task_SPI_print, "spi printing task", 150, (void*)NULL, 1, NULL);
 #if DEBUG_SPI_CONFIGURE_AS_IN_DSPS
     DSPI_SetFifoEnable(SPI0, false, false);
@@ -95,14 +95,14 @@ void SPI_sendOneByte(uint8_t byte)
 {
     uint8_t masterTxData[1];
     masterTxData[0] = byte;
-    masterXfer.txData = masterTxData;
-    masterXfer.rxData = NULL;
-    masterXfer.dataSize = sizeof(masterTxData);
-    masterXfer.configFlags = kDSPI_MasterCtar0
+    masterXfer_I2C.txData = masterTxData;
+    masterXfer_I2C.rxData = NULL;
+    masterXfer_I2C.dataSize = sizeof(masterTxData);
+    masterXfer_I2C.configFlags = kDSPI_MasterCtar0
             | EXAMPLE_DSPI_MASTER_PCS_FOR_TRANSFER | kDSPI_MasterPcsContinuous;
 
     xSemaphoreTake(g_SPI_mutex,portMAX_DELAY);     /**MUTEX take*/
-    DSPI_MasterTransferNonBlocking(SPI0, &g_m_handle, &masterXfer);
+    DSPI_MasterTransferNonBlocking(SPI0, &g_m_handle_I2C, &masterXfer_I2C);
     xSemaphoreGive(g_SPI_mutex);                    /**MUTEX release in callback */
 
     xEventGroupWaitBits(g_SPI_events, SPI_TRANSFER_IN_PROGRESS, pdTRUE, pdTRUE, portMAX_DELAY);
@@ -131,15 +131,13 @@ void probandoSPI(void* args)
     static uint8_t count = 0;
 
     SPI_msg_t * message;
-    static uint8_t mensaje[] = "hola";
-    static uint8_t vacio[] = "";
     for (;;)
     {
         message = pvPortMalloc(sizeof(SPI_msg_t)); /**memory is reserved for the message to be sent*/
         if(count >= 18){
             count = 0;
             message->LCD_to_be_clear = 1;
-            message->string_to_be_printed[0] = "";
+            message->string_to_be_printed[0] = " ";
         }else{
             message->string_to_be_printed[0] = 'h';
             message->string_to_be_printed[1] = 'o';
