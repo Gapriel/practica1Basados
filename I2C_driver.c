@@ -14,6 +14,7 @@
 #include "semphr.h"
 #include "event_groups.h"
 #include "NVIC.h"
+#include "fsl_debug_console.h"
 
 #define I2C_TRANSFER_IN_PROGRESS 1<<0
 
@@ -122,7 +123,10 @@ void task_I2C_write(void* args)
         //xEventGroupWaitBits(g_I2C_events, I2C_TRANSFER_IN_PROGRESS, pdTRUE, pdTRUE, portMAX_DELAY);
         xSemaphoreTake(g_I2C_mutex, portMAX_DELAY); /**MUTEX take*/
         I2C_MasterTransferNonBlocking(I2C1, &g_m_handle_i2c, &message->masterXfer_i2c);
+        if(message->masterXfer_i2c.direction == kI2C_Read)
+            PRINTF(message->data_buffer);
         vPortFree(message);
+
        // xSemaphoreGive(g_I2C_mutex); /**MUTEX release in callback */
 
 

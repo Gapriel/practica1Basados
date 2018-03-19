@@ -99,9 +99,9 @@ int main(void)
     BOARD_InitDebugConsole();
     xTaskCreate(SystemConfiguration, "System initial configuration", STACK_SIZE,
                 (void*) NULL, 4, NULL); /**System configuration task creation*/
-    xTaskCreate(dummy_task1, "tarea 1", STACK_SIZE, (void*) NULL, 1, NULL);
-    xTaskCreate(dummy_task2, "tarea 2", STACK_SIZE, (void*) NULL, 3, NULL);
-    xTaskCreate(dummy_task3, "tarea 3", STACK_SIZE, (void*) NULL, 1, NULL);
+   // xTaskCreate(dummy_task1, "tarea 1", STACK_SIZE, (void*) NULL, 1, NULL);
+   // xTaskCreate(dummy_task2, "tarea 2", STACK_SIZE, (void*) NULL, 3, NULL);
+   // xTaskCreate(dummy_task3, "tarea 3", STACK_SIZE, (void*) NULL, 1, NULL);
     //xTaskCreate(probandoSPI, "prueba", STACK_SIZE, (void*) NULL, 2, NULL);
     xTaskCreate(writes, "prueba 2", STACK_SIZE, (void*) NULL, 1, NULL);
     xTaskCreate(readd, "prueba 2", STACK_SIZE, (void*) NULL, 1, NULL);
