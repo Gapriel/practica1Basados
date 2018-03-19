@@ -48,20 +48,29 @@
 #include "event_groups.h"
 #include "FreeRTOSConfig.h"
 
-i2c_master_transfer_t masterXfer; //I2C_0 master transfer structure declaration
-
 static i2c_master_handle_t g_m_handle; //I2C_0 master handler declared
-SemaphoreHandle_t I2C_mutex;
-QueueHandle_t I2C_queue;
-SemaphoreHandle_t I2C_check;
+
+QueueHandle_t I2C_transfer_queue;
+EventGroupHandle_t I2C_events;
+#define I2C_free (1<< 0)
+#define I2C_data_ready (1 << 1)
+
 static void i2c_master_callback(I2C_Type *base, i2c_master_handle_t *handle,
                                 status_t status, void * userData) {
     BaseType_t pxHigherPriorityTaskWoken;
     pxHigherPriorityTaskWoken = pdFALSE;
     if (status == kStatus_Success)
     {
-        xSemaphoreGiveFromISR(I2C_mutex, &pxHigherPriorityTaskWoken);
+        if (kI2C_Read == handle->transfer.direction)
+        {
+            xEventGroupSetBitsFromISR(I2C_events, I2C_data_ready | I2C_free,
+                                      &pxHigherPriorityTaskWoken);
+        } else
+        {
+            xEventGroupSetBitsFromISR(I2C_events, I2C_free,
+                                      &pxHigherPriorityTaskWoken);
 
+        }
     }
 
     portYIELD_FROM_ISR(pxHigherPriorityTaskWoken);
@@ -77,7 +86,7 @@ void I2CInit() {
         kPORT_PassiveFilterDisable, kPORT_OpenDrainDisable,
         kPORT_LowDriveStrength, kPORT_MuxAlt2, kPORT_UnlockRegister, };
     PORT_SetPinConfig(PORTC, 10, &config_i2c);  //I2C_0 SCL pin configuration
-    PORT_SetPinConfig(PORTC, 11, &config_i2c);  //I2C_0 DSA pin configuration
+    PORT_SetPinConfig(PORTC, 11, &config_i2c);  //I2C_0 SDA pin configuration
 
     //I2C_0 master configuration
     i2c_master_config_t masterConfig;
@@ -89,61 +98,77 @@ void I2CInit() {
     I2C_MasterTransferCreateHandle(I2C1, &g_m_handle, i2c_master_callback,
     NULL);
     NVIC_EnableIRQ(I2C1_IRQn);
-    NVIC_SetPriority(I2C1_IRQn, 5);
+    NVIC_SetPriority(I2C1_IRQn, 6);
+    xEventGroupSetBits(I2C_events, I2C_free);
     vTaskDelete(NULL);
 
 }
 
-uint8_t buffer[1];
-void I2C_read() {
-    //here the read register will hold the values obtained subsequently
+void I2C_transfer() {
+    i2c_master_transfer_t *masterXfer_write_read;
 
-    //I2C_0 data block definition
-    masterXfer.slaveAddress = 0x50;
-    masterXfer.direction = kI2C_Read;
-    masterXfer.subaddress = 0x0A;
-    masterXfer.subaddressSize = 1;
-    masterXfer.data = buffer;
-    masterXfer.dataSize = 1;
-    masterXfer.flags = kI2C_TransferDefaultFlag;
-    i2c_master_transfer_t *masterXfer_enviar;
+//I2C_0 data block transmission
     while (1)
     {
-        xSemaphoreTake(I2C_mutex, portMAX_DELAY);
-        //I2C_0 data block transmission
-        I2C_MasterTransferNonBlocking(I2C1, &g_m_handle, &masterXfer);
-        masterXfer_enviar = pvPortMalloc(sizeof(i2c_master_transfer_t));
-//        masterXfer_enviar->data = masterXfer.data;
-//        masterXfer_enviar->dataSize =masterXfer.dataSize;
-        xQueueSend(I2C_queue, &masterXfer_enviar, portMAX_DELAY);
+        xQueueReceive(I2C_transfer_queue, &masterXfer_write_read,
+                      portMAX_DELAY);
+
+        /*
+         * Mutex para proteger periferico
+         */
+        xEventGroupWaitBits(I2C_events, I2C_free, pdTRUE, pdTRUE,
+        portMAX_DELAY);
+        I2C_MasterTransferNonBlocking(I2C1, &g_m_handle, masterXfer_write_read);
 
     }
+
 }
 
-void I2C_write() {
+void I2C_prueba() {
+    uint8_t valor = 0;
+    uint8_t address = 0x0A;
+    uint8_t buffer[1] = { 0 };
+    i2c_master_transfer_t *masterXfer_enviar;
 
-    i2c_master_transfer_t masterXfer_enviar;
-    i2c_master_transfer_t *masterXfer_recibir;
-
-    //I2C_0 data block definition
-    masterXfer_enviar.slaveAddress = 0x50;
-    masterXfer_enviar.direction = kI2C_Write;
-    masterXfer_enviar.subaddress = 0x0A;
-    masterXfer_enviar.subaddressSize = 1;
-    masterXfer_enviar.data = buffer;
-    masterXfer_enviar.dataSize = 1;
-    masterXfer_enviar.flags = kI2C_TransferDefaultFlag;
-
-    //I2C_0 data block transmission
+    masterXfer_enviar = pvPortMalloc(sizeof(i2c_master_transfer_t));
     while (1)
     {
-        xQueueReceive(I2C_queue, &masterXfer_recibir, portMAX_DELAY);
 
-        buffer[0] = masterXfer_recibir->data[0];
-        xSemaphoreTake(I2C_mutex, portMAX_DELAY);
-        masterXfer_enviar.data = buffer;
-        I2C_MasterTransferNonBlocking(I2C1, &g_m_handle, &masterXfer_enviar);
-        vPortFree(masterXfer_recibir);
+        //I2C_0 data block definition
+        masterXfer_enviar->slaveAddress = 0x51;
+        masterXfer_enviar->subaddress = address;
+        masterXfer_enviar->subaddressSize = 1;
+        masterXfer_enviar->data = buffer;
+        masterXfer_enviar->dataSize = 1;
+        masterXfer_enviar->flags = kI2C_TransferDefaultFlag;
+        xQueueSend(I2C_transfer_queue, &masterXfer_enviar, portMAX_DELAY);
+        /*
+         * Te esperas a enviar o responder
+         */
+        xEventGroupWaitBits(I2C_events, I2C_free, pdFALSE, pdTRUE,
+        portMAX_DELAY);
+        //I2C_0 data block definition
+        masterXfer_enviar->slaveAddress = 0x51;
+        masterXfer_enviar->subaddress = address;
+        masterXfer_enviar->subaddressSize = 1;
+        masterXfer_enviar->data = buffer;
+        masterXfer_enviar->dataSize = 1;
+        masterXfer_enviar->flags = kI2C_TransferDefaultFlag;
+        masterXfer_enviar->direction = kI2C_Read;
+
+        xQueueSend(I2C_transfer_queue, &masterXfer_enviar, portMAX_DELAY);
+
+        /*
+         *esperar a tener el dato correcto
+         */
+        xEventGroupWaitBits(I2C_events, I2C_data_ready, pdTRUE, pdTRUE,
+        portMAX_DELAY);
+
+        PRINTF("\r %i \n", buffer[0]);
+
+        valor++;
+        buffer[0] = valor + 1;
+
     }
 
 }
@@ -157,15 +182,15 @@ int main(void) {
     /* Init FSL debug console. */
     BOARD_InitDebugConsole();
 
-    I2C_mutex = xSemaphoreCreateMutex();
-    I2C_queue = xQueueCreate(2, sizeof(void*));
+    I2C_events = xEventGroupCreate();
+    I2C_transfer_queue = xQueueCreate(1, sizeof(i2c_master_transfer_t*));
+
     xTaskCreate(I2CInit, "Init I2C", configMINIMAL_STACK_SIZE + 200, NULL, 4,
     NULL);
-
-    xTaskCreate(I2C_read, "read", configMINIMAL_STACK_SIZE, NULL + 200, 2,
+    xTaskCreate(I2C_prueba, "prueba", configMINIMAL_STACK_SIZE + 200, NULL, 2,
     NULL);
-    xTaskCreate(I2C_write, "write", configMINIMAL_STACK_SIZE, NULL + 200, 3,
-    NULL);
+    xTaskCreate(I2C_transfer, "transfer", configMINIMAL_STACK_SIZE + 200, NULL,
+                3, NULL);
     vTaskStartScheduler();
 
     while (1)
