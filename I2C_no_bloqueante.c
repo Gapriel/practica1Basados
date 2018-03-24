@@ -106,9 +106,7 @@ void I2CInit() {
 void I2C_transfer() {
 
     i2c_master_transfer_t *masterXfer;
-    i2c_master_transfer_t *masterXfer_back;
     uint8_t valor_a_enviar[1];
-    masterXfer_back = pvPortMalloc(sizeof(i2c_master_transfer_t*));
 
 //I2C_0 data block transmission
     while (1)
@@ -116,24 +114,12 @@ void I2C_transfer() {
 
         xQueueReceive(I2C_write_queue, &masterXfer, portMAX_DELAY);
 
-        /*
-         * Mutex para proteger periferico
-         */
         xEventGroupWaitBits(I2C_events, I2C_free, pdTRUE, pdTRUE,
         portMAX_DELAY);
-        I2C_MasterTransferNonBlocking(I2C1, &g_m_handle, masterXfer);
-        xEventGroupWaitBits(I2C_events, I2C_free, pdTRUE, pdTRUE,
-        portMAX_DELAY);
-        masterXfer->direction = kI2C_Read;
-        masterXfer->data =valor_a_enviar;
-
         I2C_MasterTransferNonBlocking(I2C1, &g_m_handle, masterXfer);
         xEventGroupWaitBits(I2C_events, I2C_free, pdFALSE, pdTRUE,
                portMAX_DELAY);
-
-        masterXfer_back = masterXfer;
-      //  vPortFree(valor_recibido);
-        xQueueSend(I2C_read_queue,&masterXfer_back,portMAX_DELAY);
+        xQueueSend(I2C_read_queue,&masterXfer,portMAX_DELAY);
 
     }
 
@@ -142,7 +128,7 @@ void I2C_transfer() {
 void I2C_prueba() {
     i2c_master_transfer_t *masterXfer_write_read;
     i2c_master_transfer_t *masterXfer_recibido;
-    uint8_t buffer_escritura[1] = {7};
+    uint8_t buffer_escritura[1] = {4};
     masterXfer_write_read = pvPortMalloc(sizeof(i2c_master_transfer_t*));
 
 
@@ -159,22 +145,10 @@ void I2C_prueba() {
     {
 
         xQueueSend(I2C_write_queue, &masterXfer_write_read, portMAX_DELAY);
-        /*
-         * Te esperas a enviar o responder
-         */
-        //I2C_0 data block definition
+        xQueueReceive(I2C_read_queue, &masterXfer_write_read, portMAX_DELAY);
 
 
-        xQueueReceive(I2C_read_queue, &masterXfer_recibido, portMAX_DELAY);
-
-        /*
-         *esperar a tener el dato correcto
-         */
-        xEventGroupWaitBits(I2C_events, I2C_free, pdFALSE, pdTRUE,
-        portMAX_DELAY);
-
-        PRINTF("\r %i \n", masterXfer_recibido->data[0]);
-      //  vPortFree(valor_2);
+        PRINTF("\r %i \n", masterXfer_write_read->data[0]);
 
 
     }
