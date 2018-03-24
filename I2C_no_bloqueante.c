@@ -104,65 +104,68 @@ void I2CInit() {
 }
 
 void I2C_transfer() {
-    i2c_master_transfer_t masterXfer_write_read;
 
-    //I2C_0 data block definition
-    masterXfer_write_read.slaveAddress = 0x50;
-    masterXfer_write_read.subaddress = 0x01;
-    masterXfer_write_read.subaddressSize = 2;
-    masterXfer_write_read.dataSize = 1;
-    masterXfer_write_read.flags = kI2C_TransferDefaultFlag;
+    i2c_master_transfer_t *masterXfer;
+    i2c_master_transfer_t *masterXfer_back;
+    uint8_t valor_a_enviar[1];
+    masterXfer_back = pvPortMalloc(sizeof(i2c_master_transfer_t*));
 
-    uint8_t *valor_recibido;
-    uint8_t *valor_a_enviar;
-    valor_a_enviar = pvPortMalloc(sizeof(uint8_t));
-    uint8_t buffer[1] = {10};
 //I2C_0 data block transmission
     while (1)
     {
 
-        xQueueReceive(I2C_write_queue, &valor_recibido, portMAX_DELAY);
+        xQueueReceive(I2C_write_queue, &masterXfer, portMAX_DELAY);
 
         /*
          * Mutex para proteger periferico
          */
-        masterXfer_write_read.data = valor_recibido;
-        masterXfer_write_read.direction = kI2C_Write;
         xEventGroupWaitBits(I2C_events, I2C_free, pdTRUE, pdTRUE,
         portMAX_DELAY);
-        I2C_MasterTransferNonBlocking(I2C1, &g_m_handle, &masterXfer_write_read);
+        I2C_MasterTransferNonBlocking(I2C1, &g_m_handle, masterXfer);
         xEventGroupWaitBits(I2C_events, I2C_free, pdTRUE, pdTRUE,
         portMAX_DELAY);
-        masterXfer_write_read.direction = kI2C_Read;
-        masterXfer_write_read.data =valor_a_enviar;
+        masterXfer->direction = kI2C_Read;
+        masterXfer->data =valor_a_enviar;
 
-        I2C_MasterTransferNonBlocking(I2C1, &g_m_handle, &masterXfer_write_read);
+        I2C_MasterTransferNonBlocking(I2C1, &g_m_handle, masterXfer);
         xEventGroupWaitBits(I2C_events, I2C_free, pdFALSE, pdTRUE,
                portMAX_DELAY);
-        *valor_a_enviar = masterXfer_write_read.data[0];
+
+        masterXfer_back = masterXfer;
       //  vPortFree(valor_recibido);
-        xQueueSend(I2C_read_queue,&valor_a_enviar,portMAX_DELAY);
+        xQueueSend(I2C_read_queue,&masterXfer_back,portMAX_DELAY);
 
     }
 
 }
 
 void I2C_prueba() {
-    uint8_t *valor;
-    uint8_t *valor_2;
+    i2c_master_transfer_t *masterXfer_write_read;
+    i2c_master_transfer_t *masterXfer_recibido;
+    uint8_t buffer_escritura[1] = {7};
+    masterXfer_write_read = pvPortMalloc(sizeof(i2c_master_transfer_t*));
 
-    valor = pvPortMalloc(sizeof(uint8_t));
-    *valor = 10;
+
+    //I2C_0 data block definition
+    masterXfer_write_read->slaveAddress = 0x50;
+    masterXfer_write_read->subaddress = 0x01;
+    masterXfer_write_read->subaddressSize = 2;
+    masterXfer_write_read->dataSize = 1;
+    masterXfer_write_read->flags = kI2C_TransferDefaultFlag;
+    masterXfer_write_read->direction = kI2C_Write;
+    masterXfer_write_read->data = buffer_escritura;
+
     while (1)
     {
 
-        xQueueSend(I2C_write_queue, &valor, portMAX_DELAY);
+        xQueueSend(I2C_write_queue, &masterXfer_write_read, portMAX_DELAY);
         /*
          * Te esperas a enviar o responder
          */
         //I2C_0 data block definition
 
-        xQueueReceive(I2C_read_queue, &valor_2, portMAX_DELAY);
+
+        xQueueReceive(I2C_read_queue, &masterXfer_recibido, portMAX_DELAY);
 
         /*
          *esperar a tener el dato correcto
@@ -170,7 +173,7 @@ void I2C_prueba() {
         xEventGroupWaitBits(I2C_events, I2C_free, pdFALSE, pdTRUE,
         portMAX_DELAY);
 
-        PRINTF("\r %i \n", *valor_2);
+        PRINTF("\r %i \n", masterXfer_recibido->data[0]);
       //  vPortFree(valor_2);
 
 
@@ -189,8 +192,8 @@ int main(void) {
 
     I2C_events = xEventGroupCreate();
     I2C_done = xSemaphoreCreateBinary();
-    I2C_write_queue = xQueueCreate(1, sizeof(uint8_t*));
-    I2C_read_queue = xQueueCreate(1, sizeof(uint8_t*));
+    I2C_write_queue = xQueueCreate(1, sizeof(i2c_master_transfer_t*));
+    I2C_read_queue = xQueueCreate(1, sizeof(i2c_master_transfer_t*));
 
     xTaskCreate(I2CInit, "Init I2C", configMINIMAL_STACK_SIZE + 200, NULL, 4,
     NULL);
