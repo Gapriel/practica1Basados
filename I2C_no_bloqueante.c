@@ -50,8 +50,13 @@
 
 static i2c_master_handle_t g_m_handle; //I2C_0 master handler declared
 
-QueueHandle_t I2C_transfer_queue;
+QueueHandle_t I2C_write_queue;
+QueueHandle_t I2C_read_queue;
 EventGroupHandle_t I2C_events;
+
+SemaphoreHandle_t I2C_done;
+
+
 #define I2C_free (1<< 0)
 #define I2C_data_ready (1 << 1)
 
@@ -61,16 +66,10 @@ static void i2c_master_callback(I2C_Type *base, i2c_master_handle_t *handle,
     pxHigherPriorityTaskWoken = pdFALSE;
     if (status == kStatus_Success)
     {
-        if (kI2C_Read == handle->transfer.direction)
-        {
-            xEventGroupSetBitsFromISR(I2C_events, I2C_data_ready | I2C_free,
-                                      &pxHigherPriorityTaskWoken);
-        } else
-        {
+
             xEventGroupSetBitsFromISR(I2C_events, I2C_free,
                                       &pxHigherPriorityTaskWoken);
 
-        }
     }
 
     portYIELD_FROM_ISR(pxHigherPriorityTaskWoken);
@@ -105,69 +104,75 @@ void I2CInit() {
 }
 
 void I2C_transfer() {
-    i2c_master_transfer_t *masterXfer_write_read;
+    i2c_master_transfer_t masterXfer_write_read;
 
+    //I2C_0 data block definition
+    masterXfer_write_read.slaveAddress = 0x50;
+    masterXfer_write_read.subaddress = 0x01;
+    masterXfer_write_read.subaddressSize = 2;
+    masterXfer_write_read.dataSize = 1;
+    masterXfer_write_read.flags = kI2C_TransferDefaultFlag;
+
+    uint8_t *valor_recibido;
+    uint8_t *valor_a_enviar;
+    valor_a_enviar = pvPortMalloc(sizeof(uint8_t));
+    uint8_t buffer[1] = {10};
 //I2C_0 data block transmission
     while (1)
     {
-        xQueueReceive(I2C_transfer_queue, &masterXfer_write_read,
-                      portMAX_DELAY);
+
+        xQueueReceive(I2C_write_queue, &valor_recibido, portMAX_DELAY);
 
         /*
          * Mutex para proteger periferico
          */
+        masterXfer_write_read.data = valor_recibido;
+        masterXfer_write_read.direction = kI2C_Write;
         xEventGroupWaitBits(I2C_events, I2C_free, pdTRUE, pdTRUE,
         portMAX_DELAY);
-        I2C_MasterTransferNonBlocking(I2C1, &g_m_handle, masterXfer_write_read);
+        I2C_MasterTransferNonBlocking(I2C1, &g_m_handle, &masterXfer_write_read);
+        xEventGroupWaitBits(I2C_events, I2C_free, pdTRUE, pdTRUE,
+        portMAX_DELAY);
+        masterXfer_write_read.direction = kI2C_Read;
+        masterXfer_write_read.data =valor_a_enviar;
+
+        I2C_MasterTransferNonBlocking(I2C1, &g_m_handle, &masterXfer_write_read);
+        xEventGroupWaitBits(I2C_events, I2C_free, pdFALSE, pdTRUE,
+               portMAX_DELAY);
+        *valor_a_enviar = masterXfer_write_read.data[0];
+      //  vPortFree(valor_recibido);
+        xQueueSend(I2C_read_queue,&valor_a_enviar,portMAX_DELAY);
 
     }
 
 }
 
 void I2C_prueba() {
-    uint8_t valor = 0;
-    uint8_t address = 0x0A;
-    uint8_t buffer[1] = { 0 };
-    i2c_master_transfer_t *masterXfer_enviar;
+    uint8_t *valor;
+    uint8_t *valor_2;
 
-    masterXfer_enviar = pvPortMalloc(sizeof(i2c_master_transfer_t));
+    valor = pvPortMalloc(sizeof(uint8_t));
+    *valor = 10;
     while (1)
     {
 
-        //I2C_0 data block definition
-        masterXfer_enviar->slaveAddress = 0x51;
-        masterXfer_enviar->subaddress = address;
-        masterXfer_enviar->subaddressSize = 1;
-        masterXfer_enviar->data = buffer;
-        masterXfer_enviar->dataSize = 1;
-        masterXfer_enviar->flags = kI2C_TransferDefaultFlag;
-        xQueueSend(I2C_transfer_queue, &masterXfer_enviar, portMAX_DELAY);
+        xQueueSend(I2C_write_queue, &valor, portMAX_DELAY);
         /*
          * Te esperas a enviar o responder
          */
-        xEventGroupWaitBits(I2C_events, I2C_free, pdFALSE, pdTRUE,
-        portMAX_DELAY);
         //I2C_0 data block definition
-        masterXfer_enviar->slaveAddress = 0x51;
-        masterXfer_enviar->subaddress = address;
-        masterXfer_enviar->subaddressSize = 1;
-        masterXfer_enviar->data = buffer;
-        masterXfer_enviar->dataSize = 1;
-        masterXfer_enviar->flags = kI2C_TransferDefaultFlag;
-        masterXfer_enviar->direction = kI2C_Read;
 
-        xQueueSend(I2C_transfer_queue, &masterXfer_enviar, portMAX_DELAY);
+        xQueueReceive(I2C_read_queue, &valor_2, portMAX_DELAY);
 
         /*
          *esperar a tener el dato correcto
          */
-        xEventGroupWaitBits(I2C_events, I2C_data_ready, pdTRUE, pdTRUE,
+        xEventGroupWaitBits(I2C_events, I2C_free, pdFALSE, pdTRUE,
         portMAX_DELAY);
 
-        PRINTF("\r %i \n", buffer[0]);
+        PRINTF("\r %i \n", *valor_2);
+      //  vPortFree(valor_2);
 
-        valor++;
-        buffer[0] = valor + 1;
 
     }
 
@@ -183,14 +188,17 @@ int main(void) {
     BOARD_InitDebugConsole();
 
     I2C_events = xEventGroupCreate();
-    I2C_transfer_queue = xQueueCreate(1, sizeof(i2c_master_transfer_t*));
+    I2C_done = xSemaphoreCreateBinary();
+    I2C_write_queue = xQueueCreate(1, sizeof(uint8_t*));
+    I2C_read_queue = xQueueCreate(1, sizeof(uint8_t*));
 
     xTaskCreate(I2CInit, "Init I2C", configMINIMAL_STACK_SIZE + 200, NULL, 4,
     NULL);
-    xTaskCreate(I2C_prueba, "prueba", configMINIMAL_STACK_SIZE + 200, NULL, 2,
-    NULL);
     xTaskCreate(I2C_transfer, "transfer", configMINIMAL_STACK_SIZE + 200, NULL,
-                3, NULL);
+                        3, NULL);
+
+    xTaskCreate(I2C_prueba, "prueba", configMINIMAL_STACK_SIZE + 200, NULL, 3,
+    NULL);
     vTaskStartScheduler();
 
     while (1)
