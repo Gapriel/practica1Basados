@@ -50,25 +50,41 @@
 #include "FreeRTOSConfig.h"
 #include "UART_personal.h"
 #include "I2C_no_bloqueante.h"
+#include "SPI_driver.h"
+#include "SysConfiguration.h"
+#include "LCDNokia5110.h"
 
-
+#define STACK_SIZE 150
 extern QueueHandle_t UART_send_Queue;
 extern QueueHandle_t UART_receive_Queue;
 extern QueueHandle_t I2C_write_queue;
 extern QueueHandle_t I2C_read_queue;
+extern QueueHandle_t SPI_queue;
 
+
+void inicializacion_spi(void)
+{
+    xTaskCreate(SystemConfiguration, "System initial configuration", STACK_SIZE,
+                (void*) NULL, 4, NULL); /**System configuration task creation*/
+ //   xTaskCreate(probandoSPI, "prueba", STACK_SIZE, (void*) NULL, 2, NULL);
+
+}
 
 void print_task(){
+    SPI_msg_t *message;
+
 
     i2c_master_transfer_t *masterXfer_prueba;
     masterXfer_prueba = pvPortMalloc(sizeof(i2c_master_transfer_t*));
-    uint8_t buffer_prueba[1] = {0};
+  volatile  uint8_t buffer_prueba[1] = {0};
 
     uart_transfer_t* received_UART;
     uart_transfer_t* toSend_UART;
 
     toSend_UART = pvPortMalloc(sizeof(uart_transfer_t*));
     while(1){
+        message = pvPortMalloc(sizeof(SPI_msg_t*)); /**memory is reserved for the message to be sent*/
+
         /*
          * Se recibe un dato por medio de la UART
          */
@@ -79,10 +95,11 @@ void print_task(){
         masterXfer_prueba->data = received_UART->data;
         masterXfer_prueba->dataSize =1;
         masterXfer_prueba->slaveAddress =0x50;
-        masterXfer_prueba->subaddress = 0x0A;
-        masterXfer_prueba->subaddressSize =2;
+        masterXfer_prueba->subaddress = 0x04;
+        masterXfer_prueba->subaddressSize =1;
         masterXfer_prueba->flags = kI2C_TransferDefaultFlag;
         masterXfer_prueba->direction = kI2C_Write;
+#if 1
         /*
          * Se envía a la memoria por medio de I2C y se espera confirmacion de escritura
          */
@@ -93,6 +110,7 @@ void print_task(){
          * Se modifica el masterXfer para realizar una lectura en otra ubicacion para comprobar la correcta escritura/lectura
          * del dispositivo
          */
+
         masterXfer_prueba->data = buffer_prueba;
         masterXfer_prueba->direction = kI2C_Read;
         /*
@@ -103,12 +121,18 @@ void print_task(){
         /*
          * Para enviar el dato por medio de la uart se modifica toSend_UART
          */
+
         toSend_UART->data = masterXfer_prueba->data;
+#else
+        toSend_UART->data = masterXfer_prueba->data;
+#endif
         toSend_UART->dataSize = 1;
 
         /*
          * Se envia el dato por medio de la UART
          */
+        message->string_to_be_printed[0] = toSend_UART->data[0];
+        xQueueSend(SPI_queue,&message,portMAX_DELAY);
         xQueueSend(UART_send_Queue,&toSend_UART,portMAX_DELAY);
 
     }
@@ -123,7 +147,7 @@ int main(void) {
     BOARD_InitBootPeripherals();
   	/* Init FSL debug console. */
     BOARD_InitDebugConsole();
-
+    inicializacion_spi();
     inicializacion_uart();
     inicializacion_I2C();
     xTaskCreate(print_task, "PRINT TASK", configMINIMAL_STACK_SIZE, NULL, 3, NULL);

@@ -82,7 +82,7 @@ void I2CInit() {
     CLOCK_EnableClock(kCLOCK_I2c1); //I2C_1 clock enabling
 
     //I2C_0 pins configuration
-    port_pin_config_t config_i2c = { kPORT_PullUp, kPORT_SlowSlewRate,
+    port_pin_config_t config_i2c = { kPORT_PullDisable, kPORT_SlowSlewRate,
         kPORT_PassiveFilterDisable, kPORT_OpenDrainDisable,
         kPORT_LowDriveStrength, kPORT_MuxAlt2, kPORT_UnlockRegister, };
     PORT_SetPinConfig(PORTC, 10, &config_i2c);  //I2C_0 SCL pin configuration
