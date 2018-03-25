@@ -1,6 +1,17 @@
 /*
- * Copyright (c) 2017, NXP Semiconductor, Inc.
- * All rights reserved.
+ * UART_personal.h
+ *
+ *  Created on: Mar 24, 2018
+ *      Author: Paco
+ */
+
+#ifndef UART_PERSONAL_H_
+#define UART_PERSONAL_H_
+
+
+/*
+ * Copyright (c) 2015, Freescale Semiconductor, Inc.
+ * Copyright 2016-2017 NXP
  *
  * Redistribution and use in source and binary forms, with or without modification,
  * are permitted provided that the following conditions are met:
@@ -12,7 +23,7 @@
  *   list of conditions and the following disclaimer in the documentation and/or
  *   other materials provided with the distribution.
  *
- * o Neither the name of NXP Semiconductor, Inc. nor the names of its
+ * o Neither the name of the copyright holder nor the names of its
  *   contributors may be used to endorse or promote products derived from this
  *   software without specific prior written permission.
  *
@@ -28,27 +39,46 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-/**
- * @file    practice1.c
- * @brief   Application entry point.
- */
-#include <stdio.h>
 #include "board.h"
-#include "peripherals.h"
+#include "fsl_uart.h"
+
 #include "pin_mux.h"
 #include "clock_config.h"
-#include "MK64F12.h"
 #include "FreeRTOS.h"
 #include "task.h"
-#include "SysConfiguration.h"
+#include "semphr.h"
+#include "event_groups.h"
 
-#define STACK_SIZE 110
+#include "fsl_debug_console.h"
+/*******************************************************************************
+ * Definitions
+ ******************************************************************************/
+/* UART instance and clock */
+#define DEMO_UART UART0
+#define DEMO_UART_CLKSRC UART0_CLK_SRC
+#define DEMO_UART_CLK_FREQ CLOCK_GetFreq(UART0_CLK_SRC)
+#define ECHO_BUFFER_LENGTH 1
+#define txOnOffGoing (1 << 0)
+#define rxOnOffGoing (1 << 1)
+#define send_event (1 << 2)
 
-int main(void)
-{
-    xTaskCreate(SystemConfiguration, "System initial configuration", STACK_SIZE,
-                (void*) NULL, configMAX_PRIORITIES, NULL); /**System configuration task creation*/
-    vTaskStartScheduler(); /**FREERTOS scheduler control taking*/
-    for (;;);   /**practice superloop; execution doesn't reach this point*/
-    return 0;
-}
+/*
+ * Tarea encargada de enviar datos a la UART
+ */
+void uart_send_function() ;
+
+/*
+ * Tarea encargada de recibir datos de la UART
+ */
+
+void uart_receive_function() ;
+
+/*
+ * Funcion de inicializacion de la UART
+ */
+void inicializacion_uart(void) ;
+
+
+
+
+#endif /* UART_PERSONAL_H_ */

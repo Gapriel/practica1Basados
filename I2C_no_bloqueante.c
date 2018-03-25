@@ -47,6 +47,7 @@
 #include "queue.h"
 #include "event_groups.h"
 #include "FreeRTOSConfig.h"
+#include "I2C_no_bloqueante.h"
 
 static i2c_master_handle_t g_m_handle; //I2C_0 master handler declared
 
@@ -155,7 +156,7 @@ void I2C_prueba() {
 
 }
 
-int main(void) {
+void inicializacion_I2C(void) {
 
     /* Init board hardware. */
     BOARD_InitBootPins();
@@ -174,13 +175,4 @@ int main(void) {
     xTaskCreate(I2C_transfer, "transfer", configMINIMAL_STACK_SIZE + 200, NULL,
                         3, NULL);
 
-    xTaskCreate(I2C_prueba, "prueba", configMINIMAL_STACK_SIZE + 200, NULL, 3,
-    NULL);
-    vTaskStartScheduler();
-
-    while (1)
-    {
-
-    }
-    return 0;
 }
