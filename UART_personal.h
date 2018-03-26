@@ -65,19 +65,20 @@
 /*
  * Tarea encargada de enviar datos a la UART
  */
-void uart_send_function() ;
+void uart_send_task() ;
 
 /*
  * Tarea encargada de recibir datos de la UART
  */
 
-void uart_receive_function() ;
+void uart_receive_task() ;
 
 /*
  * Funcion de inicializacion de la UART
  */
-void inicializacion_uart(void) ;
+void UART_tasks(void) ;
 
+void UART_Initialization(uart_config_t *config);
 
 
 

@@ -112,10 +112,11 @@ void task_SPI_print(){
         if(pdTRUE == message->LCD_to_be_clear){
            LCDNokia_clear();
         }else{
-            /*
-           LCDNokia_sendString(message->string_to_be_printed);
- */
-            LCDNokia_sendChar(message->string_to_be_printed[0]);
+
+          // LCDNokia_sendString(message->string_to_be_printed);
+            LCDNokia_sendString(message->string);
+
+     //       LCDNokia_sendChar(message->string_to_be_printed[0]);
         }
         vPortFree(message);
     }

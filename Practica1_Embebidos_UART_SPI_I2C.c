@@ -53,6 +53,7 @@
 #include "SPI_driver.h"
 #include "SysConfiguration.h"
 #include "LCDNokia5110.h"
+#include "terminal_menus.h"
 
 #define STACK_SIZE 150
 extern QueueHandle_t UART_send_Queue;
@@ -62,15 +63,7 @@ extern QueueHandle_t I2C_read_queue;
 extern QueueHandle_t SPI_queue;
 
 
-void inicializacion_spi(void)
-{
-    xTaskCreate(SystemConfiguration, "System initial configuration", STACK_SIZE,
-                (void*) NULL, 4, NULL); /**System configuration task creation*/
- //   xTaskCreate(probandoSPI, "prueba", STACK_SIZE, (void*) NULL, 2, NULL);
-
-}
-
-void print_task(){
+void print_eco_task(){
     SPI_msg_t *message;
 
 
@@ -131,7 +124,7 @@ void print_task(){
         /*
          * Se envia el dato por medio de la UART
          */
-        message->string_to_be_printed[0] = toSend_UART->data[0];
+ //       message->string_to_be_printed[0] = toSend_UART->data[0];
         xQueueSend(SPI_queue,&message,portMAX_DELAY);
         xQueueSend(UART_send_Queue,&toSend_UART,portMAX_DELAY);
 
@@ -139,6 +132,28 @@ void print_task(){
 
 
 }
+
+
+
+void print_menu(){
+    uint8_t string[30] = "1) Memoria  ";
+    uint8_t *string2 =   "2) ECO      ";
+    SPI_msg_t *message;
+
+    vTaskDelay(pdMS_TO_TICKS(1000));
+    while(1){
+            message = pvPortMalloc(sizeof(SPI_msg_t*)); /**memory is reserved for the message to be sent*/
+            message->string =string;
+            xQueueSend(SPI_queue,&message,portMAX_DELAY);
+            vTaskDelay(pdMS_TO_TICKS(100));
+            message = pvPortMalloc(sizeof(SPI_msg_t*)); /**memory is reserved for the message to be sent*/
+            message->string =string2;
+            xQueueSend(SPI_queue,&message,portMAX_DELAY);
+            vTaskDelay(pdMS_TO_TICKS(100));
+
+       }
+}
+
 int main(void) {
 
   	/* Init board hardware. */
@@ -147,10 +162,12 @@ int main(void) {
     BOARD_InitBootPeripherals();
   	/* Init FSL debug console. */
     BOARD_InitDebugConsole();
-    inicializacion_spi();
-    inicializacion_uart();
+    xTaskCreate(SystemConfiguration, "CONFIG",configMINIMAL_STACK_SIZE,NULL,5,NULL);
+    UART_tasks();
     inicializacion_I2C();
-    xTaskCreate(print_task, "PRINT TASK", configMINIMAL_STACK_SIZE, NULL, 3, NULL);
+    xTaskCreate(print_menu, "Menu1", configMINIMAL_STACK_SIZE, NULL, 1, NULL);
+
+  //xTaskCreate(print_eco_task, "PRINT TASK", configMINIMAL_STACK_SIZE, NULL, 1, NULL);
     vTaskStartScheduler();
     while(1) {
 

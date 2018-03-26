@@ -12,10 +12,12 @@
 #include "stdint.h"
 
 
-#define STRING_MAX_LENGTH 1
+#define STRING_MAX_LENGTH 30
 
 typedef struct {
-    uint8_t string_to_be_printed[STRING_MAX_LENGTH];
+    //uint8_t string_to_be_printed[STRING_MAX_LENGTH];
+    uint8_t *string;
+
     uint8_t LCD_to_be_clear;
 } SPI_msg_t;
 

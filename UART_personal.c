@@ -43,7 +43,6 @@
  * Definitions
  ******************************************************************************/
 /* UART instance and clock */
-#define DEMO_UART UART0
 #define DEMO_UART_CLKSRC UART0_CLK_SRC
 #define DEMO_UART_CLK_FREQ CLOCK_GetFreq(UART0_CLK_SRC)
 #define ECHO_BUFFER_LENGTH 1
@@ -62,7 +61,6 @@ void UART_UserCallback(UART_Type *base, uart_handle_t *handle, status_t status,
  * Variables
  ******************************************************************************/
 uart_handle_t g_uartHandle;
-uart_config_t config;
 
 QueueHandle_t UART_receive_Queue;
 QueueHandle_t UART_send_Queue;
@@ -96,7 +94,7 @@ void UART_UserCallback(UART_Type *base, uart_handle_t *handle, status_t status,
     portYIELD_FROM_ISR(pxHigherPriorityTaskWoken);
 }
 
-void uart_send_function() {
+void uart_send_task() {
 
     static uart_transfer_t *receiveXfer_function;
 
@@ -118,7 +116,7 @@ void uart_send_function() {
 
 }
 
-void uart_receive_function() {
+void uart_receive_task() {
     static uint8_t g_rxBuffer[ECHO_BUFFER_LENGTH] = { 0 };
     uart_transfer_t *sendXfer_function;
     uart_transfer_t prueba_receive;
@@ -149,33 +147,23 @@ void uart_receive_function() {
     }
 }
 
-void inicializacion_uart(void) {
-    UART_GetDefaultConfig(&config);
-    config.baudRate_Bps = BOARD_DEBUG_UART_BAUDRATE;
-    /* config.parityMode = kUART_ParityDisabled;
-     * config.stopBitCount = kUART_OneStopBit;
-     * config.txFifoWatermark = 0;
-     * config.rxFifoWatermark = 1;
-     * config.enableTx = false;
-     * config.enableRx = false;
-     */
-    config.enableTx = true;
-    config.enableRx = true;
+void UART_tasks(void) {
+     g_UART_Events_personal = xEventGroupCreate();
 
-    UART_Init(DEMO_UART, &config, DEMO_UART_CLK_FREQ);
-    UART_TransferCreateHandle(DEMO_UART, &g_uartHandle, UART_UserCallback,
-                              NULL);
-
-    NVIC_EnableIRQ(UART0_RX_TX_IRQn);
-    NVIC_SetPriority(UART0_RX_TX_IRQn, 5);
-    g_UART_Events_personal = xEventGroupCreate();
-
-    xTaskCreate(uart_send_function, "send", configMINIMAL_STACK_SIZE + 100,
-                NULL, 3, NULL);
-    xTaskCreate(uart_receive_function, "receive",
+    xTaskCreate(uart_send_task, "send_uart", configMINIMAL_STACK_SIZE + 100,
+                NULL, 1, NULL);
+    xTaskCreate(uart_receive_task, "receive_uart",
     configMINIMAL_STACK_SIZE + 100,
-                NULL, 3, NULL);
+                NULL, 1, NULL);
 
     UART_receive_Queue = xQueueCreate(1, sizeof(uart_transfer_t*));
     UART_send_Queue = xQueueCreate(1, sizeof(uart_transfer_t*));
+}
+
+
+void UART_Initialization(uart_config_t *config){
+    UART_Init(UART0, config, CLOCK_GetFreq(UART0_CLK_SRC));
+    UART_TransferCreateHandle(UART0, &g_uartHandle, UART_UserCallback,
+                              NULL);
+
 }

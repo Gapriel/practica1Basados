@@ -158,13 +158,6 @@ void I2C_prueba() {
 
 void inicializacion_I2C(void) {
 
-    /* Init board hardware. */
-    BOARD_InitBootPins();
-    BOARD_InitBootClocks();
-    BOARD_InitBootPeripherals();
-    /* Init FSL debug console. */
-    BOARD_InitDebugConsole();
-
     I2C_events = xEventGroupCreate();
     I2C_done = xSemaphoreCreateBinary();
     I2C_write_queue = xQueueCreate(1, sizeof(i2c_master_transfer_t*));
@@ -173,6 +166,6 @@ void inicializacion_I2C(void) {
     xTaskCreate(I2CInit, "Init I2C", configMINIMAL_STACK_SIZE + 200, NULL, 4,
     NULL);
     xTaskCreate(I2C_transfer, "transfer", configMINIMAL_STACK_SIZE + 200, NULL,
-                        3, NULL);
+                        1, NULL);
 
 }
