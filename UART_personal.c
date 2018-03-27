@@ -94,6 +94,19 @@ void UART_UserCallback(UART_Type *base, uart_handle_t *handle, status_t status,
     portYIELD_FROM_ISR(pxHigherPriorityTaskWoken);
 }
 
+void Uart_putChar(uint8_t data){
+    static uart_transfer_t receiveXfer_function;
+    receiveXfer_function.dataSize = 1;
+    receiveXfer_function.data = &data;
+    UART_TransferSendNonBlocking(DEMO_UART, &g_uartHandle,
+                                                     &receiveXfer_function);
+                        xEventGroupWaitBits(g_UART_Events_personal, txOnOffGoing,
+                        pdTRUE,
+                                            pdTRUE,
+                                            portMAX_DELAY);
+}
+
+
 void uart_send_task() {
 
     static uart_transfer_t *receiveXfer_function;
@@ -105,16 +118,33 @@ void uart_send_task() {
          */
         xQueueReceive(UART_send_Queue, &receiveXfer_function, portMAX_DELAY);
 
-        UART_TransferSendNonBlocking(DEMO_UART, &g_uartHandle,
-                                     receiveXfer_function);
-        xEventGroupWaitBits(g_UART_Events_personal, txOnOffGoing,
-        pdTRUE,
-                            pdTRUE,
-                            portMAX_DELAY);
-
+        while(*receiveXfer_function->data){
+            Uart_putChar(*receiveXfer_function->data++);
+        }
     }
-
 }
+
+//void uart_send_task() {
+//
+//    static uart_transfer_t *receiveXfer_function;
+//
+//    while (1)
+//    {
+//        /*
+//         * Cuando otra tarea envia un dato por medio de esta Queue, se envía a la UART
+//         */
+//        xQueueReceive(UART_send_Queue, &receiveXfer_function, portMAX_DELAY);
+//
+//        UART_TransferSendNonBlocking(DEMO_UART, &g_uartHandle,
+//                                     receiveXfer_function);
+//        xEventGroupWaitBits(g_UART_Events_personal, txOnOffGoing,
+//        pdTRUE,
+//                            pdTRUE,
+//                            portMAX_DELAY);
+//
+//    }
+//
+//}
 
 void uart_receive_task() {
     static uint8_t g_rxBuffer[ECHO_BUFFER_LENGTH] = { 0 };

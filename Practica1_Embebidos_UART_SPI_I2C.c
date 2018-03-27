@@ -92,7 +92,6 @@ void print_eco_task(){
         masterXfer_prueba->subaddressSize =1;
         masterXfer_prueba->flags = kI2C_TransferDefaultFlag;
         masterXfer_prueba->direction = kI2C_Write;
-#if 1
         /*
          * Se envía a la memoria por medio de I2C y se espera confirmacion de escritura
          */
@@ -116,15 +115,14 @@ void print_eco_task(){
          */
 
         toSend_UART->data = masterXfer_prueba->data;
-#else
-        toSend_UART->data = masterXfer_prueba->data;
-#endif
         toSend_UART->dataSize = 1;
 
         /*
          * Se envia el dato por medio de la UART
          */
- //       message->string_to_be_printed[0] = toSend_UART->data[0];
+        message->string = toSend_UART->data;
+        message->LCD_to_be_clear = pdFALSE;
+        message->string[1] = '\0';
         xQueueSend(SPI_queue,&message,portMAX_DELAY);
         xQueueSend(UART_send_Queue,&toSend_UART,portMAX_DELAY);
 
@@ -165,9 +163,10 @@ int main(void) {
     xTaskCreate(SystemConfiguration, "CONFIG",configMINIMAL_STACK_SIZE,NULL,5,NULL);
     UART_tasks();
     inicializacion_I2C();
-    xTaskCreate(print_menu, "Menu1", configMINIMAL_STACK_SIZE, NULL, 1, NULL);
+    //xTaskCreate(print_menu, "Menu1", configMINIMAL_STACK_SIZE, NULL, 1, NULL);
 
-  //xTaskCreate(print_eco_task, "PRINT TASK", configMINIMAL_STACK_SIZE, NULL, 1, NULL);
+   //xTaskCreate(print_eco_task, "PRINT TASK", configMINIMAL_STACK_SIZE, NULL, 1, NULL);
+    xTaskCreate(TerminalMenus_ReadMemory, "test menu 1", configMINIMAL_STACK_SIZE, NULL, 1, NULL);
     vTaskStartScheduler();
     while(1) {
 
