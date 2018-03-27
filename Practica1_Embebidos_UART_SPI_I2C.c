@@ -87,9 +87,9 @@ void print_eco_task(){
          */
         masterXfer_prueba->data = received_UART->data;
         masterXfer_prueba->dataSize =1;
-        masterXfer_prueba->slaveAddress =0x50;
+        masterXfer_prueba->slaveAddress =0x51;
         masterXfer_prueba->subaddress = 0x04;
-        masterXfer_prueba->subaddressSize =1;
+        masterXfer_prueba->subaddressSize =2;
         masterXfer_prueba->flags = kI2C_TransferDefaultFlag;
         masterXfer_prueba->direction = kI2C_Write;
         /*
@@ -102,7 +102,7 @@ void print_eco_task(){
          * Se modifica el masterXfer para realizar una lectura en otra ubicacion para comprobar la correcta escritura/lectura
          * del dispositivo
          */
-
+        vTaskDelay(pdMS_TO_TICKS(20));
         masterXfer_prueba->data = buffer_prueba;
         masterXfer_prueba->direction = kI2C_Read;
         /*
@@ -165,8 +165,8 @@ int main(void) {
     inicializacion_I2C();
     //xTaskCreate(print_menu, "Menu1", configMINIMAL_STACK_SIZE, NULL, 1, NULL);
 
-   //xTaskCreate(print_eco_task, "PRINT TASK", configMINIMAL_STACK_SIZE, NULL, 1, NULL);
-    xTaskCreate(TerminalMenus_ReadMemory, "test menu 1", configMINIMAL_STACK_SIZE, NULL, 1, NULL);
+   xTaskCreate(print_eco_task, "PRINT TASK", configMINIMAL_STACK_SIZE, NULL, 1, NULL);
+   // xTaskCreate(TerminalMenus_ReadMemory, "test menu 1", configMINIMAL_STACK_SIZE, NULL, 1, NULL);
     vTaskStartScheduler();
     while(1) {
 
