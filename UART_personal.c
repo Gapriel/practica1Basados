@@ -39,6 +39,7 @@
 #include "event_groups.h"
 #include "queue.h"
 #include "fsl_debug_console.h"
+#include "fsl_port.h"
 /*******************************************************************************
  * Definitions
  ******************************************************************************/
@@ -129,6 +130,7 @@ void uart_send_task(void* args) {
         {
             Uart_putChar(UART_struct, *receiveXfer_function->data++);
         }
+
     }
 }
 
@@ -139,12 +141,13 @@ void uart_receive_task(void* args) {
     uart_transfer_t *sendXfer_function;
     uart_transfer_t receiveXfer;
 
-    sendXfer_function = pvPortMalloc(sizeof(uart_transfer_t*));
-    receiveXfer.data = g_rxBuffer;
-    receiveXfer.dataSize = ECHO_BUFFER_LENGTH;
 
     while (1)
     {
+
+        sendXfer_function = pvPortMalloc(sizeof(uart_transfer_t*));
+        receiveXfer.data = g_rxBuffer;
+        receiveXfer.dataSize = ECHO_BUFFER_LENGTH;
         /*
          *
          */
@@ -184,16 +187,42 @@ void SYSconfig_UARTConfiguration(uart_struct *UART_struct) {
 
     uart_config_t config;
     UART_GetDefaultConfig(&config);
-    config.baudRate_Bps = BOARD_DEBUG_UART_BAUDRATE;
-    config.enableTx = true;
-    config.enableRx = true;
+    port_pin_config_t uart1_configuration = { kPORT_PullDown,
+                  kPORT_SlowSlewRate, kPORT_PassiveFilterEnable, kPORT_OpenDrainDisable,
+                  kPORT_LowDriveStrength, kPORT_MuxAlt3, kPORT_UnlockRegister };
 
-    UART_Init(UART_struct->base, &config, CLOCK_GetFreq(UART0_CLK_SRC));
+    switch(UART_struct->uart_number){
+        case UART_0:
+            config.baudRate_Bps = BOARD_DEBUG_UART_BAUDRATE;
+            config.enableTx = true;
+            config.enableRx = true;
 
-    UART_TransferCreateHandle(UART_struct->base, UART_struct->handle,
-                              UART_UserCallback, (void*) UART_struct);
+            UART_Init(UART_struct->base, &config, CLOCK_GetFreq(UART0_CLK_SRC));
 
-    NVIC_EnableIRQ(UART0_RX_TX_IRQn);
-    NVIC_SetPriority(UART0_RX_TX_IRQn, 5);
+            UART_TransferCreateHandle(UART_struct->base, UART_struct->handle,
+                                      UART_UserCallback, (void*) UART_struct);
+
+            NVIC_EnableIRQ(UART0_RX_TX_IRQn);
+            NVIC_SetPriority(UART0_RX_TX_IRQn, 5);
+            break;
+        case UART_1:
+           PORT_SetPinConfig(PORTC, 3, &uart1_configuration);
+            PORT_SetPinConfig(PORTC, 4, &uart1_configuration);
+
+            config.baudRate_Bps = BOARD_DEBUG_UART_BAUDRATE;
+            config.enableTx = true;
+            config.enableRx = true;
+
+            UART_Init(UART_struct->base, &config, CLOCK_GetFreq(UART0_CLK_SRC));
+
+            UART_TransferCreateHandle(UART_struct->base, UART_struct->handle,
+                                      UART_UserCallback, (void*) UART_struct);
+
+            NVIC_EnableIRQ(UART1_RX_TX_IRQn);
+            NVIC_SetPriority(UART1_RX_TX_IRQn, 5);
+            break;
+        default:
+            break;
+    }
 
 }

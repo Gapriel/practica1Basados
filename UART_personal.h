@@ -63,6 +63,9 @@
 #define send_event (1 << 2)
 
 
+typedef enum {UART_0,UART_1,UART_2}UART_NUMBER;
+
+
 typedef struct{
 
     UART_Type *base;
@@ -70,7 +73,7 @@ typedef struct{
     EventGroupHandle_t* g_UART_Events_personal;
     QueueHandle_t* UART_receive_Queue;
     QueueHandle_t* UART_send_Queue;
-
+    UART_NUMBER uart_number;
 }uart_struct;
 
 /*

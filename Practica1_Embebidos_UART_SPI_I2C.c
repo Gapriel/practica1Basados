@@ -68,6 +68,17 @@ volatile QueueHandle_t UART0_receive_Queue;
 volatile uart_handle_t g_uart0Handle;
 volatile EventGroupHandle_t g_UART0_Events;
 
+
+static uart_struct UART_0_struct = {
+        UART0,
+        &g_uart0Handle,
+        &g_UART0_Events,
+        &UART0_receive_Queue,
+        &UART0_send_Queue,
+        UART_0
+};
+
+
 #if 0
 void print_eco_task() {
     SPI_msg_t *message;
@@ -149,19 +160,10 @@ void print_uart_prueba_parametrica(void*args){
         xQueueReceive(*UART_struct->UART_receive_Queue,&received_UART,portMAX_DELAY);
         toSend_UART->data = received_UART->data;
         xQueueSend(*UART_struct->UART_send_Queue,&toSend_UART,portMAX_DELAY);
-
+        vPortFree(received_UART);
     }
 
 }
-
-static uart_struct UART_0_struct = {
-        UART0,
-        &g_uart0Handle,
-        &g_UART0_Events,
-        &UART0_receive_Queue,
-        &UART0_send_Queue,
-};
-
 int main(void) {
 
     uart_struct * p_UART_0_struct = &UART_0_struct;
@@ -175,6 +177,9 @@ int main(void) {
                 5, NULL);
     SYSconfig_UARTConfiguration(p_UART_0_struct);
     UART_tasks((void*) p_UART_0_struct);
+    /*
+     *
+     */
     inicializacion_I2C();
 
     xTaskCreate(print_uart_prueba_parametrica, "prueba", configMINIMAL_STACK_SIZE, (void*) (p_UART_0_struct), 3, NULL);
