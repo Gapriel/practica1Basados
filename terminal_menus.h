@@ -8,6 +8,7 @@
 #ifndef TERMINAL_MENUS_H_
 #define TERMINAL_MENUS_H_
 
+void TerminalMenus_MainMenu(void* args);
 void TerminalMenus_ReadMemory(void* args);
 void TerminalMenus_WriteMemory(void* args);
 void TerminalMenus_EstablishRTCHour(void* args);

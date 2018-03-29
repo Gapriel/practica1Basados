@@ -23,7 +23,7 @@
 
 //////////////**OS SPI resources declarations*//////////////////////////
 dspi_master_handle_t g_m_handle_I2C;
-dspi_transfer_t masterXfer_I2C;
+dspi_transfer_t masterXfer_SPI;
 SemaphoreHandle_t g_SPI_mutex;
 EventGroupHandle_t g_SPI_events;
 QueueHandle_t SPI_queue;
@@ -90,14 +90,14 @@ void SPI_sendOneByte(uint8_t byte)
 {
     uint8_t masterTxData[1];
     masterTxData[0] = byte;
-    masterXfer_I2C.txData = masterTxData;
-    masterXfer_I2C.rxData = NULL;
-    masterXfer_I2C.dataSize = sizeof(masterTxData);
-    masterXfer_I2C.configFlags = kDSPI_MasterCtar0
+    masterXfer_SPI.txData = masterTxData;
+    masterXfer_SPI.rxData = NULL;
+    masterXfer_SPI.dataSize = sizeof(masterTxData);
+    masterXfer_SPI.configFlags = kDSPI_MasterCtar0
             | EXAMPLE_DSPI_MASTER_PCS_FOR_TRANSFER | kDSPI_MasterPcsContinuous;
 
     xSemaphoreTake(g_SPI_mutex,portMAX_DELAY);     /**MUTEX take*/
-    DSPI_MasterTransferNonBlocking(SPI0, &g_m_handle_I2C, &masterXfer_I2C);
+    DSPI_MasterTransferNonBlocking(SPI0, &g_m_handle_I2C, &masterXfer_SPI);
     xSemaphoreGive(g_SPI_mutex);                    /**MUTEX release in callback */
 
     xEventGroupWaitBits(g_SPI_events, SPI_TRANSFER_IN_PROGRESS, pdTRUE, pdTRUE, portMAX_DELAY);

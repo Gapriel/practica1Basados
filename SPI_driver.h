@@ -11,7 +11,6 @@
 #include "DataTypeDefinitions.h"
 #include "stdint.h"
 
-
 #define STRING_MAX_LENGTH 30
 
 typedef struct {

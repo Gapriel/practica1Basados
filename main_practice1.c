@@ -125,10 +125,7 @@ void print_eco_task(){
         message->string[1] = '\0';
         xQueueSend(SPI_queue,&message,portMAX_DELAY);
         xQueueSend(UART_send_Queue,&toSend_UART,portMAX_DELAY);
-
     }
-
-
 }
 
 
@@ -161,12 +158,10 @@ int main(void) {
   	/* Init FSL debug console. */
     BOARD_InitDebugConsole();
     xTaskCreate(SystemConfiguration, "CONFIG",configMINIMAL_STACK_SIZE,NULL,5,NULL);
-    UART_tasks();
-    inicializacion_I2C();
-    //xTaskCreate(print_menu, "Menu1", configMINIMAL_STACK_SIZE, NULL, 1, NULL);
 
-   xTaskCreate(print_eco_task, "PRINT TASK", configMINIMAL_STACK_SIZE, NULL, 1, NULL);
-   // xTaskCreate(TerminalMenus_ReadMemory, "test menu 1", configMINIMAL_STACK_SIZE, NULL, 1, NULL);
+    //xTaskCreate(print_menu, "Menu1", configMINIMAL_STACK_SIZE, NULL, 1, NULL);
+   //xTaskCreate(print_eco_task, "PRINT TASK", configMINIMAL_STACK_SIZE, NULL, 1, NULL);
+    xTaskCreate(TerminalMenus_MainMenu, "test menu 1", configMINIMAL_STACK_SIZE, NULL, 1, NULL);
     vTaskStartScheduler();
     while(1) {
 

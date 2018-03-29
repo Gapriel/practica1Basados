@@ -121,6 +121,7 @@ void uart_send_task() {
         while(*receiveXfer_function->data){
             Uart_putChar(*receiveXfer_function->data++);
         }
+        vPortFree(receiveXfer_function);
     }
 }
 
@@ -151,11 +152,13 @@ void uart_receive_task() {
     uart_transfer_t *sendXfer_function;
     uart_transfer_t prueba_receive;
 
-    sendXfer_function = pvPortMalloc(sizeof(uart_transfer_t*));
-    prueba_receive.data = g_rxBuffer;
-    prueba_receive.dataSize = ECHO_BUFFER_LENGTH;
+    //sendXfer_function = pvPortMalloc(sizeof(uart_transfer_t*));
+
     while (1)
     {
+        sendXfer_function = pvPortMalloc(sizeof(uart_transfer_t*));
+        prueba_receive.data = g_rxBuffer;
+        prueba_receive.dataSize = ECHO_BUFFER_LENGTH;
         /*
          *
          */
