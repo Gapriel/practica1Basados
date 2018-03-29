@@ -14,6 +14,8 @@
 #include "FreeRTOS.h"
 #include "task.h"
 #include "FIFO.h"
+#include "fsl_dspi.h"
+#include "SPI_driver.h"
 
 #define PTA1 (1<< 1)
 #define PTA2 (1<< 2)
@@ -29,6 +31,9 @@
 
 extern QueueHandle_t UART_send_Queue;
 extern QueueHandle_t UART_receive_Queue;
+extern QueueHandle_t I2C_write_queue;
+extern QueueHandle_t I2C_read_queue;
+extern QueueHandle_t SPI_queue;
 
 void PORTA_IRQHandler()
 {
@@ -533,6 +538,7 @@ void TerminalMenus_TerminalsCommunication(void* args)
 
 void TerminalMenus_LCDEcho(void* args)
 {
+    SPI_msg_t *charToBeMirrored;
     uint8_t firstEntryToMenu = pdFALSE;
     uart_transfer_t* received_UART;
     uint8_t charReceived = 0;
@@ -549,11 +555,23 @@ void TerminalMenus_LCDEcho(void* args)
         }
         xQueueReceive(UART_receive_Queue, &received_UART, portMAX_DELAY);
         charReceived = *received_UART->data;
-        if (ENTER != charReceived)
-        {
+        if(RETURN == charReceived){
+            charToBeMirrored = pvPortMalloc(sizeof(SPI_msg_t*));
+            charToBeMirrored->LCD_to_be_clear = pdTRUE;
+            xQueueSend(SPI_queue,&charToBeMirrored,portMAX_DELAY);
             CheckIfReturnToMenu(charReceived);
+        }
+        else if (ENTER != charReceived)
+        {
+            //CheckIfReturnToMenu(charReceived);
             CheckIfLineMovementAndUartEcho(charReceived, &LineMover);
-
+            charToBeMirrored = pvPortMalloc(sizeof(SPI_msg_t*));
+            charToBeMirrored->LCD_to_be_clear = pdFALSE;
+            uint8_t stringBuffer[2];
+            stringBuffer[0] = charReceived;
+            stringBuffer[1] = '\0';
+            charToBeMirrored->string = stringBuffer;
+            xQueueSend(SPI_queue,&charToBeMirrored,portMAX_DELAY);
         }
 
         vPortFree(received_UART); //the previously reserved memory used for the UART capture is liberated
