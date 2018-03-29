@@ -103,7 +103,7 @@ typedef struct { /**struct used to contain the various menus string to be printe
     } Strings[50]; /**stores the strings that correspond with a menu*/
 } TerminalMenuType_t;
 static TerminalMenuType_t Menus[MENUS_QUANTITY] = { //menus strings to be displayed initialization
-/**0*/ {10,{{"1) Leer Memoria I2C",     "\033[3;10H"},{"2) Escribir memoria I2C",       "\033[4;10H"}, {"3) Establecer Hora",   "\033[5;10H" },{"4) Establecer Fecha","\033[6;10H"},{"5) Formato de hora","\033[7;10H"},{"6) Leer hora","\033[8;10H"},{"7) Leer fecha","\033[9;10H"},{"8) Comunicacion con terminal 2","\033[10;10H"},{"9) Eco en LCD","\033[11;10H"},{"0) Configurar contrasena","\033[12;10H"}}},
+/**0*/ {9, {{"1) Leer Memoria I2C",     "\033[3;10H"},{"2) Escribir memoria I2C",       "\033[4;10H"}, {"3) Establecer Hora",   "\033[5;10H" },{"4) Establecer Fecha","\033[6;10H"},{"5) Formato de hora","\033[7;10H"},{"6) Leer hora","\033[8;10H"},{"7) Leer fecha","\033[9;10H"},{"8) Comunicacion con terminal 2","\033[10;10H"},{"9) Eco en LCD","\033[11;10H"} }},
 /**1*/ {7, {{"1) Leer Memoria I2C",     "\033[3;10H"},{"Direccion de lectura: ",        "\033[5;10H"}, {"0x"/*"0x0000"*/,       "\033[5;32H" },{"Longitud en bytes: ","\033[6;10H"},{"0x"/*"50"*/,        "\033[6;29H"},{"Contenido: ","\033[7;10H"},{""/*"Micros y DSP ITESO 2017"*/,"\033[8;10H"}} },
 /**2*/ {5, {{"2) Escribir memoria I2C", "\033[4;10H"},{"Direccion de escritura: ",      "\033[6;10H"}, {"0x"/*"0x0050"*/,       "\033[6;34H" },{"Texto a guardar: "  ,"\033[7;10H"},{""/*"Esta es una prueba de escritura"*/,"\033[8;10H"}} },
 /**3*/ {3, {{"3) Establecer Hora",      "\033[5;10H"},{"Escribir hora en hh:mm:ss: ",   "\033[7;10H"}, {""/*"7:30:55"*/,        "\033[7;37H" }} },
@@ -244,7 +244,7 @@ typedef struct {
     uint8_t initialPositioning;
     uint8_t lINECharsExtrictNumber[INPUT_SPACES];
     Menu_terminal_positions_t menuUartPositions;
-    uint8_t charactersPerInputSpace[INPUT_SPACES];
+    uint16_t charactersPerInputSpace[INPUT_SPACES];
 } LineMovementPack_t;
 void CheckIfLineMovementAndUartEcho(uint8_t receivedChar,
                                     LineMovementPack_t * lineMoverPack)
@@ -267,7 +267,8 @@ void CheckIfLineMovementAndUartEcho(uint8_t receivedChar,
         xQueueSend(UART_send_Queue, &toSend_UART, portMAX_DELAY);
         vTaskDelay(pdMS_TO_TICKS(20)); /**gives time for the UART to properly print the string sent*/
     }
-    if (((' '==receivedChar)||(('0' <= receivedChar) && ('9' >= receivedChar))
+    if (((' ' == receivedChar)
+            || (('0' <= receivedChar) && ('9' >= receivedChar))
             || (('A' <= receivedChar) && ('Z' >= receivedChar))
             || (('a' <= receivedChar) && ('z' >= receivedChar)))
             && (lineMoverPack->MAXwritableLines
@@ -327,15 +328,10 @@ void TerminalMenus_ReadMemory(void* args)
     uint8_t firstEntryToMenu = pdFALSE;
     uart_transfer_t* received_UART;
     uint8_t charReceived = 0;
-    LineMovementPack_t LineMover = {
-        0,
-        0,
-        2,
-        pdFALSE,
-        { pdTRUE, pdTRUE, pdTRUE }, { { { "\033[5;34H" }, { "\033[6;31H" },
+    LineMovementPack_t LineMover = { 0, 0, 2,
+    pdFALSE, { pdTRUE, pdTRUE, pdTRUE }, { { { "\033[5;34H" }, { "\033[6;31H" },
         { "\033[8;10H" } } }, //struct with constant position reference used in memory read menu
-        { 4, 2, 0 }
-    };
+        { 4, 2, 0 } };
     for (;;)
     {
         /**The task checks if it's the first time in the task, so that the menu is printed*/
@@ -358,61 +354,208 @@ void TerminalMenus_WriteMemory(void* args)
     uint8_t firstEntryToMenu = pdFALSE;
     uart_transfer_t* received_UART;
     uint8_t charReceived = 0;
-    LineMovementPack_t LineMover = {
-        0,
-        0,
-        2,
-        pdFALSE,
-        { pdTRUE, pdFALSE, pdTRUE },
-        { { { "\033[6;36H" },{ "\033[8;10H" } } }, //struct with constant position reference used in memory write menu
-        { 4, 1,0 }
-    };
-   for(;;){
-       if (pdFALSE == firstEntryToMenu)
-               {
-                   firstEntryToMenu = pdTRUE;
-                   MenuPrinter(PC_UART, WriteMemoryI2C); //TODO: identify which terminal is inside the function
-               }
-               xQueueReceive(UART_receive_Queue, &received_UART, portMAX_DELAY);
-               charReceived = *received_UART->data;
-               CheckIfReturnToMenu(charReceived);
-               CheckIfLineMovementAndUartEcho(charReceived, &LineMover);
+    LineMovementPack_t LineMover = { 0, 0, 2,
+    pdFALSE, { pdTRUE, pdFALSE, pdTRUE }, {
+        { { "\033[6;36H" }, { "\033[8;10H" } } }, //struct with constant position reference used in memory write menu
+        { 4, 1, 0 } };
+    for (;;)
+    {
+        if (pdFALSE == firstEntryToMenu)
+        {
+            firstEntryToMenu = pdTRUE;
+            MenuPrinter(PC_UART, WriteMemoryI2C); //TODO: identify which terminal is inside the function
+        }
+        xQueueReceive(UART_receive_Queue, &received_UART, portMAX_DELAY);
+        charReceived = *received_UART->data;
+        CheckIfReturnToMenu(charReceived);
+        CheckIfLineMovementAndUartEcho(charReceived, &LineMover);
 
-               vPortFree(received_UART); //the previously reserved memory used for the UART capture is liberated
-   }
+        vPortFree(received_UART); //the previously reserved memory used for the UART capture is liberated
+    }
 }
 
 void TerminalMenus_EstablishRTCHour(void* args)
 {
+    uint8_t firstEntryToMenu = pdFALSE;
+    uart_transfer_t* received_UART;
+    uint8_t charReceived = 0;
+    LineMovementPack_t LineMover = { 0, 0, 1,
+    pdFALSE, { pdTRUE, pdTRUE, pdTRUE }, {
+        { { "\033[7;37H" }, { "\033[7;37H" } } }, //struct with constant position reference used in memory read menu
+        { 6, 0 } };
+    for (;;)
+    {
+        /**The task checks if it's the first time in the task, so that the menu is printed*/
+        if (pdFALSE == firstEntryToMenu)
+        {
+            firstEntryToMenu = pdTRUE;
+            MenuPrinter(PC_UART, StablishHour); //TODO: identify which terminal is inside the function
+        }
+        xQueueReceive(UART_receive_Queue, &received_UART, portMAX_DELAY);
+        charReceived = *received_UART->data;
+        CheckIfReturnToMenu(charReceived);
+        CheckIfLineMovementAndUartEcho(charReceived, &LineMover);
 
+        vPortFree(received_UART); //the previously reserved memory used for the UART capture is liberated
+    }
 }
 
 void TerminalMenus_EstablishRTCDate(void* args)
 {
+    uint8_t firstEntryToMenu = pdFALSE;
+    uart_transfer_t* received_UART;
+    uint8_t charReceived = 0;
+    LineMovementPack_t LineMover = { 0, 0, 1,
+    pdFALSE, { pdTRUE, pdTRUE, pdTRUE }, {
+        { { "\033[8;38H" }, { "\033[8;38H" } } }, //struct with constant position reference used in memory read menu
+        { 6, 0 } };
+    for (;;)
+    {
+        /**The task checks if it's the first time in the task, so that the menu is printed*/
+        if (pdFALSE == firstEntryToMenu)
+        {
+            firstEntryToMenu = pdTRUE;
+            MenuPrinter(PC_UART, StablishDate); //TODO: identify which terminal is inside the function
+        }
+        xQueueReceive(UART_receive_Queue, &received_UART, portMAX_DELAY);
+        charReceived = *received_UART->data;
+        CheckIfReturnToMenu(charReceived);
+        CheckIfLineMovementAndUartEcho(charReceived, &LineMover);
 
+        vPortFree(received_UART); //the previously reserved memory used for the UART capture is liberated
+    }
 }
 
 void TerminalMenus_EstablishRTCHourFormat(void* args)
 {
+    uint8_t firstEntryToMenu = pdFALSE;
+    uart_transfer_t* received_UART;
+    uint8_t charReceived = 0;
+    LineMovementPack_t LineMover = { 0, 0, 1,
+    pdFALSE, { pdTRUE, pdTRUE, pdTRUE }, { { { "\033[10;43H" },
+        { "\033[10;43H" } } }, //struct with constant position reference used in memory read menu
+        { 1, 0 } };
+    for (;;)
+    {
+        /**The task checks if it's the first time in the task, so that the menu is printed*/
+        if (pdFALSE == firstEntryToMenu)
+        {
+            firstEntryToMenu = pdTRUE;
+            MenuPrinter(PC_UART, TimeFormat); //TODO: identify which terminal is inside the function
+        }
+        xQueueReceive(UART_receive_Queue, &received_UART, portMAX_DELAY);
+        charReceived = *received_UART->data;
+        CheckIfReturnToMenu(charReceived);
+        CheckIfLineMovementAndUartEcho(charReceived, &LineMover);
 
+        vPortFree(received_UART); //the previously reserved memory used for the UART capture is liberated
+    }
 }
 
 void TerminalMenus_ReadRTCHour(void* args)
 {
+    uint8_t firstEntryToMenu = pdFALSE;
+    uart_transfer_t* received_UART;
+    uint8_t charReceived = 0;
+    LineMovementPack_t LineMover = { 0, 0, 1,
+    pdFALSE, { pdTRUE, pdTRUE, pdTRUE }, { { { "\033[11;10H" } } }, //struct with constant position reference used in memory read menu
+        { 0, 0 } };
+    for (;;)
+    {
+        /**The task checks if it's the first time in the task, so that the menu is printed*/
+        if (pdFALSE == firstEntryToMenu)
+        {
+            firstEntryToMenu = pdTRUE;
+            MenuPrinter(PC_UART, ReadHour); //TODO: identify which terminal is inside the function
+        }
+        xQueueReceive(UART_receive_Queue, &received_UART, portMAX_DELAY);
+        charReceived = *received_UART->data;
+        CheckIfReturnToMenu(charReceived);
+        CheckIfLineMovementAndUartEcho(charReceived, &LineMover);
 
+        vPortFree(received_UART); //the previously reserved memory used for the UART capture is liberated
+    }
 }
 
 void TerminalMenus_ReadRTCDate(void* args)
 {
+    uint8_t firstEntryToMenu = pdFALSE;
+    uart_transfer_t* received_UART;
+    uint8_t charReceived = 0;
+    LineMovementPack_t LineMover = { 0, 0, 1,
+    pdFALSE, { pdTRUE, pdTRUE, pdTRUE }, { { { "\033[12;10H" } } }, //struct with constant position reference used in memory read menu
+        { 0, 0 } };
+    for (;;)
+    {
+        /**The task checks if it's the first time in the task, so that the menu is printed*/
+        if (pdFALSE == firstEntryToMenu)
+        {
+            firstEntryToMenu = pdTRUE;
+            MenuPrinter(PC_UART, ReadDate); //TODO: identify which terminal is inside the function
+        }
+        xQueueReceive(UART_receive_Queue, &received_UART, portMAX_DELAY);
+        charReceived = *received_UART->data;
+        CheckIfReturnToMenu(charReceived);
+        CheckIfLineMovementAndUartEcho(charReceived, &LineMover);
 
+        vPortFree(received_UART); //the previously reserved memory used for the UART capture is liberated
+    }
 }
 
 void TerminalMenus_TerminalsCommunication(void* args)
 {
+    uint8_t firstEntryToMenu = pdFALSE;
+    uart_transfer_t* received_UART;
+    uint8_t charReceived = 0;
+    LineMovementPack_t LineMover = { 0, 0, 1,
+    pdFALSE, { pdFALSE, pdTRUE, pdTRUE }, { { { "\033[12;10H" } } }, //struct with constant position reference used in memory read menu
+        { 10000, 0 } };
+    for (;;)
+    {
+        /**The task checks if it's the first time in the task, so that the menu is printed*/
+        if (pdFALSE == firstEntryToMenu)
+        {
+            firstEntryToMenu = pdTRUE;
+            MenuPrinter(PC_UART, Terminal2Communication); //TODO: identify which terminal is inside the function
+        }
+        xQueueReceive(UART_receive_Queue, &received_UART, portMAX_DELAY);
+        charReceived = *received_UART->data;
+        if (ENTER != charReceived)
+        {
+            CheckIfReturnToMenu(charReceived);
+            CheckIfLineMovementAndUartEcho(charReceived, &LineMover);
 
+        }
+
+        vPortFree(received_UART); //the previously reserved memory used for the UART capture is liberated
+    }
 }
 
 void TerminalMenus_LCDEcho(void* args)
 {
+    uint8_t firstEntryToMenu = pdFALSE;
+    uart_transfer_t* received_UART;
+    uint8_t charReceived = 0;
+    LineMovementPack_t LineMover = { 0, 0, 1,
+    pdFALSE, { pdFALSE, pdTRUE, pdTRUE }, { { { "\033[14;10H" } } }, //struct with constant position reference used in memory read menu
+        { 10000, 0 } };
+    for (;;)
+    {
+        /**The task checks if it's the first time in the task, so that the menu is printed*/
+        if (pdFALSE == firstEntryToMenu)
+        {
+            firstEntryToMenu = pdTRUE;
+            MenuPrinter(PC_UART, LCDEcho); //TODO: identify which terminal is inside the function
+        }
+        xQueueReceive(UART_receive_Queue, &received_UART, portMAX_DELAY);
+        charReceived = *received_UART->data;
+        if (ENTER != charReceived)
+        {
+            CheckIfReturnToMenu(charReceived);
+            CheckIfLineMovementAndUartEcho(charReceived, &LineMover);
 
+        }
+
+        vPortFree(received_UART); //the previously reserved memory used for the UART capture is liberated
+    }
 }
