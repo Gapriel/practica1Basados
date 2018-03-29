@@ -37,7 +37,7 @@
 #include "task.h"
 #include "semphr.h"
 #include "event_groups.h"
-
+#include "fsl_port.h"
 #include "fsl_debug_console.h"
 /*******************************************************************************
  * Definitions
@@ -60,33 +60,32 @@ void UART_UserCallback(UART_Type *base, uart_handle_t *handle, status_t status,
 /*******************************************************************************
  * Variables
  ******************************************************************************/
-uart_handle_t g_uartHandle;
 
-QueueHandle_t UART_receive_Queue;
-QueueHandle_t UART_send_Queue;
-
-EventGroupHandle_t g_UART_Events_personal;
 
 /*******************************************************************************
  * Code
  ******************************************************************************/
 
+
 /* UART user callback */
 void UART_UserCallback(UART_Type *base, uart_handle_t *handle, status_t status,
                        void *userData) {
-    userData = userData;
+
+    uart_struct* UART_struct = (uart_struct*) userData;
     BaseType_t pxHigherPriorityTaskWoken;
     pxHigherPriorityTaskWoken = pdFALSE;
 
     if (kStatus_UART_TxIdle == status)
     {
-        xEventGroupSetBitsFromISR(g_UART_Events_personal, txOnOffGoing,
+
+        xEventGroupSetBitsFromISR(*UART_struct->g_UART_Events_personal,
+        txOnOffGoing,
                                   &pxHigherPriorityTaskWoken);
     }
 
     if (kStatus_UART_RxIdle == status)
     {
-        xEventGroupSetBitsFromISR(g_UART_Events_personal,
+        xEventGroupSetBitsFromISR(*UART_struct->g_UART_Events_personal,
         rxOnOffGoing | send_event,
                                   &pxHigherPriorityTaskWoken);
 
@@ -94,109 +93,131 @@ void UART_UserCallback(UART_Type *base, uart_handle_t *handle, status_t status,
     portYIELD_FROM_ISR(pxHigherPriorityTaskWoken);
 }
 
-void Uart_putChar(uint8_t data){
+void Uart_putChar(uart_struct* UART_struct, uint8_t data) {
     static uart_transfer_t receiveXfer_function;
     receiveXfer_function.dataSize = 1;
     receiveXfer_function.data = &data;
-    UART_TransferSendNonBlocking(DEMO_UART, &g_uartHandle,
-                                                     &receiveXfer_function);
-                        xEventGroupWaitBits(g_UART_Events_personal, txOnOffGoing,
+    UART_TransferSendNonBlocking(UART_struct->base, UART_struct->handle,
+                                 &receiveXfer_function);
+    xEventGroupWaitBits(*UART_struct->g_UART_Events_personal, txOnOffGoing,
+    pdTRUE,
                         pdTRUE,
-                                            pdTRUE,
-                                            portMAX_DELAY);
+                        portMAX_DELAY);
 }
 
+void uart_send_task(void* args) {
 
-void uart_send_task() {
+    uart_struct* UART_struct = (uart_struct*) args;
 
     static uart_transfer_t *receiveXfer_function;
-
     while (1)
     {
         /*
          * Cuando otra tarea envia un dato por medio de esta Queue, se envía a la UART
          */
-        xQueueReceive(UART_send_Queue, &receiveXfer_function, portMAX_DELAY);
 
-        while(*receiveXfer_function->data){
-            Uart_putChar(*receiveXfer_function->data++);
+        xQueueReceive(*UART_struct->UART_send_Queue, &receiveXfer_function,
+                      portMAX_DELAY);
+
+        while (*receiveXfer_function->data)
+        {
+            Uart_putChar(UART_struct, *receiveXfer_function->data++);
         }
         vPortFree(receiveXfer_function);
     }
 }
 
-//void uart_send_task() {
-//
-//    static uart_transfer_t *receiveXfer_function;
-//
-//    while (1)
-//    {
-//        /*
-//         * Cuando otra tarea envia un dato por medio de esta Queue, se envía a la UART
-//         */
-//        xQueueReceive(UART_send_Queue, &receiveXfer_function, portMAX_DELAY);
-//
-//        UART_TransferSendNonBlocking(DEMO_UART, &g_uartHandle,
-//                                     receiveXfer_function);
-//        xEventGroupWaitBits(g_UART_Events_personal, txOnOffGoing,
-//        pdTRUE,
-//                            pdTRUE,
-//                            portMAX_DELAY);
-//
-//    }
-//
-//}
+void uart_receive_task(void* args) {
+    uart_struct* UART_struct = (uart_struct*) args;
 
-void uart_receive_task() {
     static uint8_t g_rxBuffer[ECHO_BUFFER_LENGTH] = { 0 };
     uart_transfer_t *sendXfer_function;
-    uart_transfer_t prueba_receive;
+    uart_transfer_t receiveXfer;
 
-    //sendXfer_function = pvPortMalloc(sizeof(uart_transfer_t*));
 
     while (1)
     {
+
         sendXfer_function = pvPortMalloc(sizeof(uart_transfer_t*));
-        prueba_receive.data = g_rxBuffer;
-        prueba_receive.dataSize = ECHO_BUFFER_LENGTH;
+        receiveXfer.data = g_rxBuffer;
+        receiveXfer.dataSize = ECHO_BUFFER_LENGTH;
         /*
          *
          */
-        UART_TransferReceiveNonBlocking(DEMO_UART, &g_uartHandle,
-                                        &prueba_receive, NULL);
+        UART_TransferReceiveNonBlocking(UART_struct->base, UART_struct->handle,
+                                        &receiveXfer, NULL);
         /*
          * Espera un dato en cualquier momento
          */
-        xEventGroupWaitBits(g_UART_Events_personal, rxOnOffGoing,
-        pdTRUE,
-                            pdTRUE, portMAX_DELAY);
-        sendXfer_function->data = prueba_receive.data;
-        sendXfer_function->dataSize = prueba_receive.dataSize;
+        xEventGroupWaitBits(*UART_struct->g_UART_Events_personal, rxOnOffGoing,
+                            pdTRUE, pdTRUE, portMAX_DELAY);
+        sendXfer_function->data = receiveXfer.data;
+        sendXfer_function->dataSize = receiveXfer.dataSize;
         /*
          * Lo envia por medio de una Queue para que cualquier tarea pueda leerlo
          */
-        xQueueSend(UART_receive_Queue, &sendXfer_function, 0);
+        xQueueSend(*UART_struct->UART_receive_Queue, &sendXfer_function, portMAX_DELAY);
 
     }
 }
 
-void UART_tasks(void) {
-     g_UART_Events_personal = xEventGroupCreate();
+
+void UART_tasks(void*args) {
+    uart_struct* UART_struct = (uart_struct*) (args);
+    *UART_struct->g_UART_Events_personal = xEventGroupCreate();
 
     xTaskCreate(uart_send_task, "send_uart", configMINIMAL_STACK_SIZE + 100,
-                NULL, 1, NULL);
+                UART_struct, 2, NULL);
     xTaskCreate(uart_receive_task, "receive_uart",
     configMINIMAL_STACK_SIZE + 100,
-                NULL, 1, NULL);
+                UART_struct, 2, NULL);
 
-    UART_receive_Queue = xQueueCreate(1, sizeof(uart_transfer_t*));
-    UART_send_Queue = xQueueCreate(1, sizeof(uart_transfer_t*));
+    *UART_struct->UART_receive_Queue = xQueueCreate(1,
+                                                    sizeof(uart_transfer_t*));
+    *UART_struct->UART_send_Queue = xQueueCreate(1, sizeof(uart_transfer_t*));
 }
 
 
-void UART_Initialization(uart_config_t *config){
-    UART_Init(UART0, config, CLOCK_GetFreq(UART0_CLK_SRC));
-    UART_TransferCreateHandle(UART0, &g_uartHandle, UART_UserCallback,
-                              NULL);
+void SYSconfig_UARTConfiguration(uart_struct *UART_struct) {
+
+    uart_config_t config;
+    UART_GetDefaultConfig(&config);
+    port_pin_config_t uart1_configuration = { kPORT_PullDown,
+                  kPORT_SlowSlewRate, kPORT_PassiveFilterEnable, kPORT_OpenDrainDisable,
+                  kPORT_LowDriveStrength, kPORT_MuxAlt3, kPORT_UnlockRegister };
+
+    switch(UART_struct->uart_number){
+        case UART_0:
+            config.baudRate_Bps = BOARD_DEBUG_UART_BAUDRATE;
+            config.enableTx = true;
+            config.enableRx = true;
+
+            UART_Init(UART_struct->base, &config, CLOCK_GetFreq(UART0_CLK_SRC));
+
+            UART_TransferCreateHandle(UART_struct->base, UART_struct->handle,
+                                      UART_UserCallback, (void*) UART_struct);
+
+            NVIC_EnableIRQ(UART0_RX_TX_IRQn);
+            NVIC_SetPriority(UART0_RX_TX_IRQn, 5);
+            break;
+        case UART_1:
+           PORT_SetPinConfig(PORTC, 3, &uart1_configuration);
+            PORT_SetPinConfig(PORTC, 4, &uart1_configuration);
+
+            config.baudRate_Bps = BOARD_DEBUG_UART_BAUDRATE;
+            config.enableTx = true;
+            config.enableRx = true;
+
+            UART_Init(UART_struct->base, &config, CLOCK_GetFreq(UART0_CLK_SRC));
+
+            UART_TransferCreateHandle(UART_struct->base, UART_struct->handle,
+                                      UART_UserCallback, (void*) UART_struct);
+
+            NVIC_EnableIRQ(UART1_RX_TX_IRQn);
+            NVIC_SetPriority(UART1_RX_TX_IRQn, 5);
+            break;
+        default:
+            break;
+    }
 
 }

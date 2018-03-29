@@ -62,24 +62,40 @@
 #define rxOnOffGoing (1 << 1)
 #define send_event (1 << 2)
 
+
+typedef enum {UART_0,UART_1,UART_2}UART_NUMBER;
+
+
+typedef struct{
+
+    UART_Type *base;
+    uart_handle_t* handle;
+    EventGroupHandle_t* g_UART_Events_personal;
+    QueueHandle_t* UART_receive_Queue;
+    QueueHandle_t* UART_send_Queue;
+    UART_NUMBER uart_number;
+}uart_struct;
+
+
 /*
  * Tarea encargada de enviar datos a la UART
  */
-void uart_send_task() ;
+void uart_send_task(void*) ;
 
 /*
  * Tarea encargada de recibir datos de la UART
  */
 
-void uart_receive_task() ;
+void uart_receive_task(void*) ;
 
 /*
  * Funcion de inicializacion de la UART
  */
-void UART_tasks(void) ;
-
-void UART_Initialization(uart_config_t *config);
+void UART_tasks(void*) ;
 
 
+
+
+void SYSconfig_UARTConfiguration(uart_struct *UART_struct) ;
 
 #endif /* UART_PERSONAL_H_ */

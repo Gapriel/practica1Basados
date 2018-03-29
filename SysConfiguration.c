@@ -19,7 +19,6 @@
 #include "NVIC.h"
 #include "fsl_debug_console.h"
 #include "UART_personal.h"
-#include "I2C_no_bloqueante.h"
 
 //////////////////**user types definitions*////////////////////////////
 typedef enum {
@@ -62,13 +61,11 @@ void SystemConfiguration(void* args) {
         CLOCK_EnableClock(kCLOCK_PortC);
         /**modules configuration*/
         SYSconfig_ButtonsConfiguration(); /**buttons configuration*/
-        SYSconfig_UARTConfiguration(); /**UART module configuration*/
-
         SYSconfig_SPIConfiguration(); /**SPI module configuration (including device initialization)*/
-        SYSconfig_I2CConfiguration(); /**I2C module configuration*/
+        // SYSconfig_I2CConfiguration(); /**I2C module configuration*/
 
-        //vTaskSuspend(NULL); /**the function auto suspends itself, as it won't be used again*/
-        vTaskDelete(NULL);
+        vTaskSuspend(NULL); /**the function auto suspends itself, as it won't be used again*/
+        //vTaskDelete(NULL);
     }
 }
 
@@ -92,6 +89,7 @@ void SYSconfig_ButtonsConfiguration() { /**this function responsibility is to co
     NVIC_enableInterruptAndPriotity(PORTA_IRQn, 6);
     NVIC_enableInterruptAndPriotity(PORTB_IRQn, 6);
     NVIC_enableInterruptAndPriotity(PORTC_IRQn, 6);
+
 }
 
 void SYSconfig_SPIConfiguration() {
@@ -100,28 +98,64 @@ void SYSconfig_SPIConfiguration() {
     LCDNokia_clear();/*! It clears the information printed in the LCD*/
 }
 
-void SYSconfig_UARTConfiguration() {
 
-    uart_config_t config;
-    UART_GetDefaultConfig(&config);
-    config.baudRate_Bps = BOARD_DEBUG_UART_BAUDRATE;
-    /* config.parityMode = kUART_ParityDisabled;
-     * config.stopBitCount = kUART_OneStopBit;
-     * config.txFifoWatermark = 0;
-     * config.rxFifoWatermark = 1;
-     * config.enableTx = false;
-     * config.enableRx = false;
-     */
-    config.enableTx = true;
-    config.enableRx = true;
-
-    UART_Initialization(&config);
-    UART_tasks();
-
-    NVIC_EnableIRQ(UART0_RX_TX_IRQn);
-    NVIC_SetPriority(UART0_RX_TX_IRQn, 5);
-}
 
 void SYSconfig_I2CConfiguration() {
-    inicializacion_I2C();
 }
+
+////////////**I2C Bug fixing functions provided by NXP*/////////////
+//static void i2c_release_bus_delay(void)
+//{
+//    uint32_t i = 0;
+//    for (i = 0; i < 100; i++)
+//    {
+//        __NOP();
+//    }
+//}
+//void i2c_ReleaseBus()
+//{
+//    uint8_t i = 0;
+//    gpio_pin_config_t pin_config;
+//    port_pin_config_t i2c_pin_config = { 0 };
+//
+//    /* Config pin mux as gpio */
+//    i2c_pin_config.pullSelect = kPORT_PullUp;
+//    i2c_pin_config.mux = kPORT_MuxAsGpio;
+//
+//    pin_config.pinDirection = kGPIO_DigitalOutput;
+//    pin_config.outputLogic = 1U;
+//    CLOCK_EnableClock(kCLOCK_PortE);
+//    PORT_SetPinConfig(PORTE, 24, &i2c_pin_config);
+//    PORT_SetPinConfig(PORTE, 25, &i2c_pin_config);
+//
+//    GPIO_PinInit(GPIOE, 24, &pin_config);
+//    GPIO_PinInit(GPIOE, 25, &pin_config);
+//
+//    GPIO_PinWrite(GPIOE, 25, 0U);
+//    i2c_release_bus_delay();
+//
+//    for (i = 0; i < 9; i++)
+//    {
+//        GPIO_PinWrite(GPIOE, 24, 0U);
+//        i2c_release_bus_delay();
+//
+//        GPIO_PinWrite(GPIOE, 25, 1U);
+//        i2c_release_bus_delay();
+//
+//        GPIO_PinWrite(GPIOE, 24, 1U);
+//        i2c_release_bus_delay();
+//        i2c_release_bus_delay();
+//    }
+//
+//    GPIO_PinWrite(GPIOE, 24, 0U);
+//    i2c_release_bus_delay();
+//
+//    GPIO_PinWrite(GPIOE, 25, 0U);
+//    i2c_release_bus_delay();
+//
+//    GPIO_PinWrite(GPIOE, 24, 1U);
+//    i2c_release_bus_delay();
+//
+//    GPIO_PinWrite(GPIOE, 25, 1U);
+//    i2c_release_bus_delay();
+//}
