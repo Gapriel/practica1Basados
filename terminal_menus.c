@@ -33,6 +33,9 @@
 #define MENUS_QUANTITY 11
 
 extern QueueHandle_t SPI_queue;
+extern SemaphoreHandle_t MainMenus_semaphore;
+
+
 
 void PORTA_IRQHandler() {
     uint32_t InterruptFlags;
@@ -152,6 +155,7 @@ static TerminalMenuType_t Menus[MENUS_QUANTITY] = { //menus strings to be displa
 
 /////////////////////////////////////////MECHANISMS DEFINITIONS/////////////////////////////////////////////
 void MenuPrinter(uart_struct* uart_struct, uint8_t menuToBePrinted) {
+
     uart_transfer_t* toSend_UART;
     uint8_t printedStringIndex = 0;
     uint8_t screen_erease[] = { "\033[2J" }; /**VT100 terminal clear screen command*/

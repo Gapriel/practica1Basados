@@ -182,7 +182,7 @@ void SYSconfig_UARTConfiguration(uart_struct *UART_struct) {
 
     uart_config_t config;
     UART_GetDefaultConfig(&config);
-    port_pin_config_t uart1_configuration = { kPORT_PullDown,
+    port_pin_config_t uart1_configuration = { kPORT_PullDisable,
                   kPORT_SlowSlewRate, kPORT_PassiveFilterEnable, kPORT_OpenDrainDisable,
                   kPORT_LowDriveStrength, kPORT_MuxAlt3, kPORT_UnlockRegister };
 
@@ -201,13 +201,15 @@ void SYSconfig_UARTConfiguration(uart_struct *UART_struct) {
             NVIC_SetPriority(UART0_RX_TX_IRQn, 5);
             break;
         case UART_1:
-           PORT_SetPinConfig(PORTC, 3, &uart1_configuration);
-            PORT_SetPinConfig(PORTC, 4, &uart1_configuration);
 
-            config.baudRate_Bps = BOARD_DEBUG_UART_BAUDRATE;
+            CLOCK_EnableClock(kCLOCK_PortC);
+            CLOCK_EnableClock(kCLOCK_Uart1);
+            config.baudRate_Bps = 9600U;
+
             config.enableTx = true;
             config.enableRx = true;
-
+            PORT_SetPinConfig(PORTC, 3, &uart1_configuration);
+            PORT_SetPinConfig(PORTC, 4, &uart1_configuration);
             UART_Init(UART_struct->base, &config, CLOCK_GetFreq(UART0_CLK_SRC));
 
             UART_TransferCreateHandle(UART_struct->base, UART_struct->handle,

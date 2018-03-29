@@ -66,6 +66,13 @@ volatile QueueHandle_t UART0_receive_Queue;
 volatile uart_handle_t g_uart0Handle;
 volatile EventGroupHandle_t g_UART0_Events;
 
+
+volatile QueueHandle_t UART1_send_Queue;
+volatile QueueHandle_t UART1_receive_Queue;
+volatile uart_handle_t g_uart1Handle;
+volatile EventGroupHandle_t g_UART1_Events;
+
+
 static uart_struct UART_0_struct = {
         UART0,
         &g_uart0Handle,
@@ -73,6 +80,16 @@ static uart_struct UART_0_struct = {
         &UART0_receive_Queue,
         &UART0_send_Queue,
         UART_0
+};
+
+
+static uart_struct UART_1_struct = {
+        UART1,
+        &g_uart1Handle,
+        &g_UART1_Events,
+        &UART1_receive_Queue,
+        &UART1_send_Queue,
+        UART_1
 };
 
 #if 0
@@ -143,6 +160,7 @@ void print_eco_task(){
 
 #endif
 
+SemaphoreHandle_t MainMenus_semaphore;
 
 int main(void) {
 
@@ -153,6 +171,7 @@ int main(void) {
   	/* Init FSL debug console. */
     BOARD_InitDebugConsole();
     uart_struct* p_UART_0_struct = &UART_0_struct;
+    uart_struct* p_UART_1_struct = &UART_1_struct;
 
 
     xTaskCreate(SystemConfiguration, "CONFIG",configMINIMAL_STACK_SIZE,NULL,5,NULL);
@@ -160,10 +179,17 @@ int main(void) {
     SYSconfig_UARTConfiguration(p_UART_0_struct);
     UART_tasks((void*) p_UART_0_struct);
 
+    SYSconfig_UARTConfiguration(p_UART_1_struct);
+    UART_tasks((void*) p_UART_1_struct);
+
+    MainMenus_semaphore = xSemaphoreCreateMutex();
+
     inicializacion_I2C();
     //xTaskCreate(print_menu, "Menu1", configMINIMAL_STACK_SIZE, NULL, 1, NULL);
    //xTaskCreate(print_eco_task, "PRINT TASK", configMINIMAL_STACK_SIZE, NULL, 1, NULL);
-    xTaskCreate(TerminalMenus_MainMenu, "test menu 1", configMINIMAL_STACK_SIZE, (void*)p_UART_0_struct, 1, NULL);
+    xTaskCreate(TerminalMenus_MainMenu, "test menu 0", configMINIMAL_STACK_SIZE+ 10, (void*)p_UART_0_struct,1, NULL);
+    xTaskCreate(TerminalMenus_MainMenu, "test menu 1", configMINIMAL_STACK_SIZE+ 10, (void*)p_UART_1_struct, 1, NULL);
+
     vTaskStartScheduler();
     while(1) {
 
