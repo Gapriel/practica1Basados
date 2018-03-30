@@ -32,6 +32,7 @@ typedef struct{
     uint8_t FIFO_index;				/**variable used to store the current fifo index*/
 }FIFO_stacks_t;
 
+FIFO_stacks_t* FIFO_stacks_address(uint8_t fifo_number);
 
 /********************************************************************************************/
 /********************************************************************************************/
@@ -70,5 +71,8 @@ uint8_t FIFO_checkIfEmpty(uint8_t fifo_number);
  	\return nothing
  */
 void FIFO_clearFIFOs();
+
+
+
 
 #endif

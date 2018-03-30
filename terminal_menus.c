@@ -354,6 +354,8 @@ void CheckIfLineMovementAndUartEcho(uart_struct* UART_struct,
                     == lineMoverPack->lINECharsExtrictNumber[lineMoverPack->menuPositionLineIndex])
             {
                 lineMoverPack->linePositionIndex++;
+
+                FIFO_push(lineMoverPack->menuPositionLineIndex, receivedChar);
                 toSend_UART = pvPortMalloc(sizeof(uart_transfer_t*));
                 toSend_UART->dataSize = 1;
                 uint8_t buffer[2] = { 0, '\0' };
@@ -463,7 +465,7 @@ void TerminalMenus_ReadMemory(void* args) {
             xSemaphoreGive(I2C_done);
 
             xQueueSend(I2C_write_queue,&masterXfer_I2C_read,portMAX_DELAY);
-1            xSemaphoreTake(I2C_done,portMAX_DELAY);
+            xSemaphoreTake(I2C_done,portMAX_DELAY);
             xSemaphoreGive(I2C_done);
             uart_transfer_t* toSend_UART;
             toSend_UART = pvPortMalloc(sizeof(uart_transfer_t*));
@@ -507,6 +509,31 @@ void TerminalMenus_WriteMemory(void* args) {
         CharacterValidator(&LineMover, WriteMemoryI2C, charReceived);
         CheckIfReturnToMenu(UART_struct,charReceived);
         CheckIfLineMovementAndUartEcho(UART_struct, charReceived, &LineMover);
+
+        if(2 <= LineMover.menuPositionLineIndex){
+            i2c_master_transfer_t *masterXfer_I2C_write;
+            masterXfer_I2C_write = pvPortMalloc(sizeof(i2c_master_transfer_t*));
+            uint16_t subaddress = ASCII_TO_uint8_t(0, 4);
+            FIFO_stacks_t* local_fifo = FIFO_stacks_address(1);
+            masterXfer_I2C_write->data = local_fifo->FIFO_array;
+            masterXfer_I2C_write->dataSize = local_fifo->FIFO_index;
+            masterXfer_I2C_write->direction = kI2C_Write;
+            masterXfer_I2C_write->flags = kI2C_TransferDefaultFlag;
+            masterXfer_I2C_write->slaveAddress = 0x51;
+            masterXfer_I2C_write->subaddress = (uint32_t)subaddress;
+            masterXfer_I2C_write->subaddressSize = 2;
+            xSemaphoreGive(I2C_done);
+            xQueueSend(I2C_write_queue,&masterXfer_I2C_write,portMAX_DELAY);
+            xSemaphoreTake(I2C_done,portMAX_DELAY);
+            xSemaphoreGive(I2C_done);
+            vPortFree(masterXfer_I2C_write);
+
+
+        }
+
+
+
+
 
         vPortFree(received_UART); //the previously reserved memory used for the UART capture is liberated
     }

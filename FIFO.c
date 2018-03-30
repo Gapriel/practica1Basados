@@ -20,6 +20,10 @@ FIFO_stacks_t FIFOs[5] = {
 uint8_t PopFlag = FALSE;	//flag used to know if the pop function has been called the first time
 uint8_t FIFO_forwardIndex = 0;	//index variable used to move the stack forward while doing pops, and achieve a FIFO behavior
 
+FIFO_stacks_t* FIFO_stacks_address(uint8_t fifo_number){
+    return &FIFOs[fifo_number];
+}
+
 uint8_t FIFO_push(uint8_t fifo_number, uint8 data){
 	if(FIFO_SIZE < FIFOs[fifo_number].FIFO_index){	//if the fifo index exceeds the fifo size,
 		FIFOs[fifo_number].Full_flag = TRUE;		//the fifo is full
@@ -31,6 +35,7 @@ uint8_t FIFO_push(uint8_t fifo_number, uint8 data){
 	}
 	return FIFOs[fifo_number].Full_flag;	//returns current FIFO full flag status
 }
+
 
 uint8_t FIFO_pop(uint8_t fifo_number){
 	if(FALSE == PopFlag){	//if it's the first time pop has been called,
