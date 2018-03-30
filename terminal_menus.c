@@ -19,7 +19,6 @@
 #include "UART_personal.h"
 #include "semphr.h"
 #include "event_groups.h"
-
 #define PTA1 (1<< 1)
 #define PTA2 (1<< 2)
 #define PTB23 (1 << 23)
@@ -33,9 +32,25 @@
 #define MENUS_QUANTITY 11
 
 extern QueueHandle_t SPI_queue;
-extern SemaphoreHandle_t MainMenus_semaphore;
 
 
+#define STRING_SIZE 77
+typedef struct {
+    struct {
+        uint8_t terminal_position[9];
+    } Positions[INPUT_SPACES];
+} Menu_terminal_positions_t;
+
+typedef struct {
+    uint8_t menuPositionLineIndex;
+    uint8_t linePositionIndex;
+    uint8_t MAXwritableLines;
+    uint8_t initialPositioning;
+    uint8_t lINECharsExtrictNumber[INPUT_SPACES];
+    Menu_terminal_positions_t menuUartPositions;
+    uint16_t charactersPerInputSpace[INPUT_SPACES];
+    uint8_t validCharacter;
+} LineMovementPack_t;
 
 void PORTA_IRQHandler() {
     uint32_t InterruptFlags;
@@ -94,12 +109,6 @@ typedef enum { /**enum used to seamlessly call the different terminal menus */
     ErrorScreen
 } MenusType;
 
-#define STRING_SIZE 77
-typedef struct {
-    struct {
-        uint8_t terminal_position[9];
-    } Positions[INPUT_SPACES];
-} Menu_terminal_positions_t;
 typedef struct { /**struct used to contain the various menus string to be printed*/
     uint8_t Strings_quantity; /**stores how many strings will be printed*/
     struct {
@@ -188,6 +197,55 @@ void MenuPrinter(uart_struct* uart_struct, uint8_t menuToBePrinted) {
     }
 }
 
+
+
+void CharacterValidator(LineMovementPack_t *Pack, uint8_t menuToBePrinted,uint8_t receivedChar){
+
+
+    switch(menuToBePrinted){
+        case ReadMemoryI2C:
+            if (        (('0' <= receivedChar) && ('9' >= receivedChar))
+                        || (('A' <= receivedChar) && ('F' >= receivedChar))
+                        || (('a' <= receivedChar) && ('f' >= receivedChar)))
+            {
+                Pack->validCharacter = pdTRUE;
+            }else{
+                Pack->validCharacter = pdFALSE;
+            }
+            break;
+        case WriteMemoryI2C:
+            Pack->validCharacter = pdTRUE;
+            break;
+        case StablishHour:
+        case StablishDate:
+            if ( ('0' <= receivedChar) && (receivedChar <= '9') ){
+                Pack->validCharacter = pdTRUE;
+            }else{
+                Pack->validCharacter = pdFALSE;
+            }
+            break;
+        case TimeFormat:
+            if ( ('0' <= receivedChar ) && (receivedChar<= '1') ){
+                          Pack->validCharacter = pdTRUE;
+                      }else{
+                          Pack->validCharacter = pdFALSE;
+                      }
+                      break;
+        case ReadHour:
+        case ReadDate:
+            Pack->validCharacter = pdFALSE;
+            break;
+        case Terminal2Communication:
+        case LCDEcho:
+            Pack->validCharacter = pdTRUE;
+            break;
+
+
+    }
+
+
+}
+
 void CreateMenuTask(uart_struct* uart_struct, uint8_t menuToBeCreated) {
     switch (menuToBeCreated)
     {
@@ -259,15 +317,8 @@ void CheckIfReturnToMenu(uart_struct* uart_struct, uint8_t receivedChar) {
     }
 }
 
-typedef struct {
-    uint8_t menuPositionLineIndex;
-    uint8_t linePositionIndex;
-    uint8_t MAXwritableLines;
-    uint8_t initialPositioning;
-    uint8_t lINECharsExtrictNumber[INPUT_SPACES];
-    Menu_terminal_positions_t menuUartPositions;
-    uint16_t charactersPerInputSpace[INPUT_SPACES];
-} LineMovementPack_t;
+
+
 void CheckIfLineMovementAndUartEcho(uart_struct* UART_struct,
                                     uint8_t receivedChar,
                                     LineMovementPack_t * lineMoverPack) {
@@ -289,11 +340,7 @@ void CheckIfLineMovementAndUartEcho(uart_struct* UART_struct,
         xQueueSend(*UART_struct->UART_send_Queue, &toSend_UART, portMAX_DELAY);
         vTaskDelay(pdMS_TO_TICKS(20)); /**gives time for the UART to properly print the string sent*/
     }
-    if (((' ' == receivedChar)
-            || (('0' <= receivedChar) && ('9' >= receivedChar))
-            || (('A' <= receivedChar) && ('Z' >= receivedChar))
-            || (('a' <= receivedChar) && ('z' >= receivedChar)))
-            && (lineMoverPack->MAXwritableLines
+    if ((pdTRUE == lineMoverPack->validCharacter) && (lineMoverPack->MAXwritableLines
                     > lineMoverPack->menuPositionLineIndex))
     {
         if (lineMoverPack->charactersPerInputSpace[lineMoverPack->menuPositionLineIndex]
@@ -369,6 +416,7 @@ void TerminalMenus_ReadMemory(void* args) {
         xQueueReceive(*UART_struct->UART_receive_Queue, &received_UART,
                       portMAX_DELAY);
         charReceived = *received_UART->data;
+        CharacterValidator(&LineMover, ReadMemoryI2C, charReceived);
         CheckIfReturnToMenu(UART_struct,charReceived);
         CheckIfLineMovementAndUartEcho(UART_struct, charReceived, &LineMover);
 
@@ -396,6 +444,8 @@ void TerminalMenus_WriteMemory(void* args) {
         xQueueReceive(*UART_struct->UART_receive_Queue, &received_UART,
                       portMAX_DELAY);
         charReceived = *received_UART->data;
+
+        CharacterValidator(&LineMover, WriteMemoryI2C, charReceived);
         CheckIfReturnToMenu(UART_struct,charReceived);
         CheckIfLineMovementAndUartEcho(UART_struct, charReceived, &LineMover);
 
@@ -424,6 +474,8 @@ void TerminalMenus_EstablishRTCHour(void* args) {
         xQueueReceive(*UART_struct->UART_receive_Queue, &received_UART,
                       portMAX_DELAY);
         charReceived = *received_UART->data;
+
+        CharacterValidator(&LineMover, StablishHour, charReceived);
         CheckIfReturnToMenu(UART_struct,charReceived);
         CheckIfLineMovementAndUartEcho(UART_struct, charReceived, &LineMover);
 
@@ -452,6 +504,8 @@ void TerminalMenus_EstablishRTCDate(void* args) {
         xQueueReceive(*UART_struct->UART_receive_Queue, &received_UART,
                       portMAX_DELAY);
         charReceived = *received_UART->data;
+
+        CharacterValidator(&LineMover, StablishDate, charReceived);
         CheckIfReturnToMenu(UART_struct,charReceived);
         CheckIfLineMovementAndUartEcho(UART_struct, charReceived, &LineMover);
 
@@ -480,6 +534,8 @@ void TerminalMenus_EstablishRTCHourFormat(void* args) {
         xQueueReceive(*UART_struct->UART_receive_Queue, &received_UART,
                       portMAX_DELAY);
         charReceived = *received_UART->data;
+
+        CharacterValidator(&LineMover, TimeFormat, charReceived);
         CheckIfReturnToMenu(UART_struct,charReceived);
         CheckIfLineMovementAndUartEcho(UART_struct, charReceived, &LineMover);
 
@@ -507,6 +563,8 @@ void TerminalMenus_ReadRTCHour(void* args) {
         xQueueReceive(*UART_struct->UART_receive_Queue, &received_UART,
                       portMAX_DELAY);
         charReceived = *received_UART->data;
+
+        CharacterValidator(&LineMover, ReadHour, charReceived);
         CheckIfReturnToMenu(UART_struct,charReceived);
         CheckIfLineMovementAndUartEcho(UART_struct, charReceived, &LineMover);
 
@@ -534,6 +592,8 @@ void TerminalMenus_ReadRTCDate(void* args) {
         xQueueReceive(*UART_struct->UART_receive_Queue, &received_UART,
                       portMAX_DELAY);
         charReceived = *received_UART->data;
+
+        CharacterValidator(&LineMover, ReadDate, charReceived);
         CheckIfReturnToMenu(UART_struct,charReceived);
         CheckIfLineMovementAndUartEcho(UART_struct, charReceived, &LineMover);
 
@@ -563,6 +623,8 @@ void TerminalMenus_TerminalsCommunication(void* args) {
         charReceived = *received_UART->data;
         if (ENTER != charReceived)
         {
+
+            CharacterValidator(&LineMover, Terminal2Communication, charReceived);
             CheckIfReturnToMenu(UART_struct,charReceived);
             CheckIfLineMovementAndUartEcho(UART_struct, charReceived,
                                            &LineMover);
@@ -603,6 +665,8 @@ void TerminalMenus_LCDEcho(void* args) {
         } else if (ENTER != charReceived)
         {
             //CheckIfReturnToMenu(charReceived);
+
+           CharacterValidator(&LineMover, LCDEcho, charReceived);
             CheckIfLineMovementAndUartEcho(UART_struct, charReceived,
                                            &LineMover);
             charToBeMirrored = pvPortMalloc(sizeof(SPI_msg_t*));

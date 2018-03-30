@@ -75,10 +75,11 @@ void SPI_configuration()
 #endif
     DSPI_MasterInit(SPI0, &masterConfig, CLOCK_GetBusClkFreq());
     NVIC_enableInterruptAndPriotity(SPI0_IRQn, 7);
+
+   xTaskCreate(task_SPI_print, "spi printing task", configMINIMAL_STACK_SIZE, (void*)NULL, 5, NULL);
     DSPI_MasterTransferCreateHandle(SPI0, &g_m_handle_I2C, DSPI_MasterUserCallback,
                                     NULL);
     //NVIC_enableInterruptAndPriotity(SPI0_IRQn,5);
-    xTaskCreate(task_SPI_print, "spi printing task", 150, (void*)NULL, 1, NULL);
 #if DEBUG_SPI_CONFIGURE_AS_IN_DSPS
     DSPI_SetFifoEnable(SPI0, false, false);
     DSPI_Enable(SPI0, true);
@@ -105,7 +106,8 @@ void SPI_sendOneByte(uint8_t byte)
 }
 
 
-void task_SPI_print(){
+void task_SPI_print(void*args){
+    vTaskDelay(pdMS_TO_TICKS(500));
     static SPI_msg_t *message;
     for(;;){
         xQueueReceive(SPI_queue, &message, portMAX_DELAY);

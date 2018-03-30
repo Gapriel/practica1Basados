@@ -61,11 +61,10 @@ void SystemConfiguration(void* args) {
         CLOCK_EnableClock(kCLOCK_PortC);
         /**modules configuration*/
         SYSconfig_ButtonsConfiguration(); /**buttons configuration*/
-        SYSconfig_SPIConfiguration(); /**SPI module configuration (including device initialization)*/
+       SYSconfig_SPIConfiguration(); /**SPI module configuration (including device initialization)*/
         // SYSconfig_I2CConfiguration(); /**I2C module configuration*/
 
-        vTaskSuspend(NULL); /**the function auto suspends itself, as it won't be used again*/
-        //vTaskDelete(NULL);
+        vTaskDelete(NULL);
     }
 }
 

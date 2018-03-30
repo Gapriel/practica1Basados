@@ -23,5 +23,5 @@ typedef struct {
 void SPI_configuration();
 void SPI_sendOneByte(uint8_t byte);
 void probandoSPI(void* args);
-
+void task_SPI_print(void*args);
 #endif /* SPI_DRIVER_H_ */

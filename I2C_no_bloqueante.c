@@ -163,9 +163,9 @@ void inicializacion_I2C(void) {
     I2C_write_queue = xQueueCreate(1, sizeof(i2c_master_transfer_t*));
     I2C_read_queue = xQueueCreate(1, sizeof(i2c_master_transfer_t*));
 
-    xTaskCreate(I2CInit, "Init I2C", configMINIMAL_STACK_SIZE + 200, NULL, 4,
+    xTaskCreate(I2CInit, "Init I2C", configMINIMAL_STACK_SIZE , NULL, 4,
     NULL);
-    xTaskCreate(I2C_transfer, "transfer", configMINIMAL_STACK_SIZE + 200, NULL,
+    xTaskCreate(I2C_transfer, "transfer", configMINIMAL_STACK_SIZE, NULL,
                         1, NULL);
 
 }

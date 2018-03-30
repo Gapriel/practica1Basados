@@ -157,10 +157,8 @@ void print_eco_task(){
         xQueueSend(UART_send_Queue,&toSend_UART,portMAX_DELAY);
     }
 }
-
 #endif
 
-SemaphoreHandle_t MainMenus_semaphore;
 
 int main(void) {
 
@@ -176,19 +174,16 @@ int main(void) {
 
     xTaskCreate(SystemConfiguration, "CONFIG",configMINIMAL_STACK_SIZE,NULL,5,NULL);
 
-    SYSconfig_UARTConfiguration(p_UART_0_struct);
+   SYSconfig_UARTConfiguration(p_UART_0_struct);
     UART_tasks((void*) p_UART_0_struct);
 
-    SYSconfig_UARTConfiguration(p_UART_1_struct);
-    UART_tasks((void*) p_UART_1_struct);
+   SYSconfig_UARTConfiguration(p_UART_1_struct);
+   UART_tasks((void*) p_UART_1_struct);
 
-    MainMenus_semaphore = xSemaphoreCreateMutex();
 
     inicializacion_I2C();
-    //xTaskCreate(print_menu, "Menu1", configMINIMAL_STACK_SIZE, NULL, 1, NULL);
-   //xTaskCreate(print_eco_task, "PRINT TASK", configMINIMAL_STACK_SIZE, NULL, 1, NULL);
-    xTaskCreate(TerminalMenus_MainMenu, "test menu 0", configMINIMAL_STACK_SIZE+ 10, (void*)p_UART_0_struct,1, NULL);
-    xTaskCreate(TerminalMenus_MainMenu, "test menu 1", configMINIMAL_STACK_SIZE+ 10, (void*)p_UART_1_struct, 1, NULL);
+    xTaskCreate(TerminalMenus_MainMenu, "test menu 0", configMINIMAL_STACK_SIZE, (void*)p_UART_0_struct,1, NULL);
+  //  xTaskCreate(TerminalMenus_MainMenu, "test menu 1", configMINIMAL_STACK_SIZE, (void*)p_UART_1_struct, 1, NULL);
 
     vTaskStartScheduler();
     while(1) {

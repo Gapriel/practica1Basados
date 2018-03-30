@@ -166,14 +166,13 @@ void UART_tasks(void*args) {
     uart_struct* UART_struct = (uart_struct*) (args);
     *UART_struct->g_UART_Events_personal = xEventGroupCreate();
 
-    xTaskCreate(uart_send_task, "send_uart", configMINIMAL_STACK_SIZE + 100,
+    xTaskCreate(uart_send_task, "send_uart", configMINIMAL_STACK_SIZE ,
                 UART_struct, 2, NULL);
     xTaskCreate(uart_receive_task, "receive_uart",
-    configMINIMAL_STACK_SIZE + 100,
+    configMINIMAL_STACK_SIZE  ,
                 UART_struct, 2, NULL);
 
-    *UART_struct->UART_receive_Queue = xQueueCreate(1,
-                                                    sizeof(uart_transfer_t*));
+    *UART_struct->UART_receive_Queue = xQueueCreate(1, sizeof(uart_transfer_t*));
     *UART_struct->UART_send_Queue = xQueueCreate(1, sizeof(uart_transfer_t*));
 }
 
