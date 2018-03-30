@@ -19,6 +19,9 @@
 #include "UART_personal.h"
 #include "semphr.h"
 #include "event_groups.h"
+#include "I2C_no_bloqueante.h"
+
+
 #define PTA1 (1<< 1)
 #define PTA2 (1<< 2)
 #define PTB23 (1 << 23)
@@ -32,7 +35,9 @@
 #define MENUS_QUANTITY 11
 
 extern QueueHandle_t SPI_queue;
-
+extern QueueHandle_t I2C_read_queue;
+extern QueueHandle_t I2C_write_queue;
+extern SemaphoreHandle_t I2C_done;
 
 #define STRING_SIZE 77
 typedef struct {
@@ -169,7 +174,7 @@ void MenuPrinter(uart_struct* uart_struct, uint8_t menuToBePrinted) {
     uint8_t printedStringIndex = 0;
     uint8_t screen_erease[] = { "\033[2J" }; /**VT100 terminal clear screen command*/
     toSend_UART = pvPortMalloc(sizeof(uart_transfer_t*));
-    toSend_UART->data = &screen_erease;
+    toSend_UART->data = screen_erease;
     toSend_UART->dataSize = 1;
 
     xQueueSend(*uart_struct->UART_send_Queue, &toSend_UART, portMAX_DELAY);
@@ -179,7 +184,7 @@ void MenuPrinter(uart_struct* uart_struct, uint8_t menuToBePrinted) {
     {
         toSend_UART = pvPortMalloc(sizeof(uart_transfer_t*));
         toSend_UART->data =
-                &Menus[menuToBePrinted].Strings[printedStringIndex].positionXYCommand;
+                Menus[menuToBePrinted].Strings[printedStringIndex].positionXYCommand;
         toSend_UART->dataSize = 1;
 
         xQueueSend(*uart_struct->UART_send_Queue, &toSend_UART, portMAX_DELAY);
@@ -187,7 +192,7 @@ void MenuPrinter(uart_struct* uart_struct, uint8_t menuToBePrinted) {
         vTaskDelay(pdMS_TO_TICKS(20)); /**gives time for the UART to properly print the string sent*/
         toSend_UART = pvPortMalloc(sizeof(uart_transfer_t*));
         toSend_UART->data =
-                &Menus[menuToBePrinted].Strings[printedStringIndex].String;
+                Menus[menuToBePrinted].Strings[printedStringIndex].String;
         toSend_UART->dataSize = 1;
 
         xQueueSend(*uart_struct->UART_send_Queue, &toSend_UART, portMAX_DELAY);
@@ -251,7 +256,7 @@ void CreateMenuTask(uart_struct* uart_struct, uint8_t menuToBeCreated) {
     {
         case ReadMemoryI2C:
             xTaskCreate(TerminalMenus_ReadMemory, "Read Memory Menu",
-                        configMINIMAL_STACK_SIZE, (void*) uart_struct, 3, NULL);
+                        configMINIMAL_STACK_SIZE + 50, (void*) uart_struct, 3, NULL);
             vTaskDelete(NULL);
         break;
         case WriteMemoryI2C:
@@ -335,8 +340,7 @@ void CheckIfLineMovementAndUartEcho(uart_struct* UART_struct,
         lineMoverPack->linePositionIndex = 0;
         toSend_UART = pvPortMalloc(sizeof(uart_transfer_t*));
         toSend_UART->dataSize = 1;
-        toSend_UART->data =
-                &lineMoverPack->menuUartPositions.Positions[lineMoverPack->menuPositionLineIndex];
+        toSend_UART->data = &lineMoverPack->menuUartPositions.Positions[lineMoverPack->menuPositionLineIndex];
         xQueueSend(*UART_struct->UART_send_Queue, &toSend_UART, portMAX_DELAY);
         vTaskDelay(pdMS_TO_TICKS(20)); /**gives time for the UART to properly print the string sent*/
     }
@@ -354,7 +358,7 @@ void CheckIfLineMovementAndUartEcho(uart_struct* UART_struct,
                 toSend_UART->dataSize = 1;
                 uint8_t buffer[2] = { 0, '\0' };
                 buffer[0] = receivedChar;
-                toSend_UART->data = &buffer;
+                toSend_UART->data = buffer;
                 xQueueSend(*UART_struct->UART_send_Queue, &toSend_UART,
                            portMAX_DELAY);
                 vTaskDelay(pdMS_TO_TICKS(20)); /**gives time for the UART to properly print the string sent*/
@@ -362,11 +366,12 @@ void CheckIfLineMovementAndUartEcho(uart_struct* UART_struct,
         } else
         {
             lineMoverPack->linePositionIndex++;
+            FIFO_push(lineMoverPack->menuPositionLineIndex, receivedChar);
             toSend_UART = pvPortMalloc(sizeof(uart_transfer_t*));
             toSend_UART->dataSize = 1;
             uint8_t buffer[2] = { 0, '\0' };
             buffer[0] = receivedChar;
-            toSend_UART->data = &buffer;
+            toSend_UART->data = buffer;
             xQueueSend(*UART_struct->UART_send_Queue, &toSend_UART,
                        portMAX_DELAY);
             vTaskDelay(pdMS_TO_TICKS(20)); /**gives time for the UART to properly print the string sent*/
@@ -396,11 +401,31 @@ void TerminalMenus_MainMenu(void* args) {
     }
 }
 
+uint16_t ASCII_TO_uint8_t (uint8_t fifo_number,uint8_t fifo_pops){
+    uint8_t ascii_address_index;
+    uint16_t address = 0;
+    uint8_t fifo_value;
+    for (ascii_address_index = 0; ascii_address_index < fifo_pops ;ascii_address_index++){
+        fifo_value = FIFO_pop(fifo_number);
+        if(('0' <= fifo_value ) && (fifo_value <='9')){
+            fifo_value -= '0';
+        }else if(('A' <= fifo_value ) && (fifo_value <='F')){
+            fifo_value -=('A' - 10);
+        }
+        address += (fifo_value << (4*(fifo_pops - ascii_address_index - 1)));
+    }
+    FIFO_pop(fifo_number);
+    return address;
+}
+
+
+
 void TerminalMenus_ReadMemory(void* args) {
     uart_struct* UART_struct = (uart_struct*) args;
     uint8_t firstEntryToMenu = pdFALSE;
     uart_transfer_t* received_UART;
     uint8_t charReceived = 0;
+    FIFO_clearFIFOs();
     LineMovementPack_t LineMover = { 0, 0, 2,
     pdFALSE, { pdTRUE, pdTRUE, pdTRUE }, { { { "\033[5;34H" }, { "\033[6;31H" },
         { "\033[8;10H" } } }, //struct with constant position reference used in memory read menu
@@ -420,6 +445,39 @@ void TerminalMenus_ReadMemory(void* args) {
         CheckIfReturnToMenu(UART_struct,charReceived);
         CheckIfLineMovementAndUartEcho(UART_struct, charReceived, &LineMover);
 
+
+        if(2 <= LineMover.menuPositionLineIndex){
+            i2c_master_transfer_t *masterXfer_I2C_read;
+            masterXfer_I2C_read = pvPortMalloc(sizeof(i2c_master_transfer_t*));
+            uint8_t BytesToRead = (uint8_t) ASCII_TO_uint8_t(1, 2);
+            uint16_t subaddress = ASCII_TO_uint8_t(0, 4);
+            uint8_t read_buffer[50] = {0};
+            masterXfer_I2C_read->data = read_buffer;
+            masterXfer_I2C_read->dataSize = BytesToRead;
+            masterXfer_I2C_read->direction = kI2C_Read;
+            masterXfer_I2C_read->flags = kI2C_TransferDefaultFlag;
+            masterXfer_I2C_read->slaveAddress = 0x51;
+            masterXfer_I2C_read->subaddress = (uint32_t)subaddress;
+            masterXfer_I2C_read->subaddressSize = 2;
+            read_buffer[BytesToRead] = '\0';
+            xSemaphoreGive(I2C_done);
+
+            xQueueSend(I2C_write_queue,&masterXfer_I2C_read,portMAX_DELAY);
+1            xSemaphoreTake(I2C_done,portMAX_DELAY);
+            xSemaphoreGive(I2C_done);
+            uart_transfer_t* toSend_UART;
+            toSend_UART = pvPortMalloc(sizeof(uart_transfer_t*));
+            toSend_UART->data = read_buffer;
+            toSend_UART->dataSize = 1;
+            xQueueSend(*UART_struct->UART_send_Queue, &toSend_UART,portMAX_DELAY);
+            vPortFree(masterXfer_I2C_read);
+
+
+        }
+
+
+
+
         vPortFree(received_UART); //the previously reserved memory used for the UART capture is liberated
     }
 }
@@ -430,6 +488,7 @@ void TerminalMenus_WriteMemory(void* args) {
     uint8_t firstEntryToMenu = pdFALSE;
     uart_transfer_t* received_UART;
     uint8_t charReceived = 0;
+    FIFO_clearFIFOs();
     LineMovementPack_t LineMover = { 0, 0, 2,
     pdFALSE, { pdTRUE, pdFALSE, pdTRUE }, {
         { { "\033[6;36H" }, { "\033[8;10H" } } }, //struct with constant position reference used in memory write menu

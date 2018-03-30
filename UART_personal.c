@@ -94,21 +94,20 @@ void UART_UserCallback(UART_Type *base, uart_handle_t *handle, status_t status,
 }
 
 void Uart_putChar(uart_struct* UART_struct, uint8_t data) {
+    uint8_t data1[1] = {data   };
     static uart_transfer_t receiveXfer_function;
     receiveXfer_function.dataSize = 1;
-    receiveXfer_function.data = &data;
+    receiveXfer_function.data = data1;
     UART_TransferSendNonBlocking(UART_struct->base, UART_struct->handle,
                                  &receiveXfer_function);
     xEventGroupWaitBits(*UART_struct->g_UART_Events_personal, txOnOffGoing,
-    pdTRUE,
-                        pdTRUE,
-                        portMAX_DELAY);
+    pdTRUE, pdTRUE, portMAX_DELAY);
 }
 
 void uart_send_task(void* args) {
 
     uart_struct* UART_struct = (uart_struct*) args;
-
+    vTaskDelay(pdMS_TO_TICKS(100));
     static uart_transfer_t *receiveXfer_function;
     while (1)
     {
@@ -116,9 +115,10 @@ void uart_send_task(void* args) {
          * Cuando otra tarea envia un dato por medio de esta Queue, se envía a la UART
          */
 
+
+
         xQueueReceive(*UART_struct->UART_send_Queue, &receiveXfer_function,
                       portMAX_DELAY);
-
         while (*receiveXfer_function->data)
         {
             Uart_putChar(UART_struct, *receiveXfer_function->data++);

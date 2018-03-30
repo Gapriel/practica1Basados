@@ -51,11 +51,11 @@
 
 static i2c_master_handle_t g_m_handle; //I2C_0 master handler declared
 
-QueueHandle_t I2C_write_queue;
-QueueHandle_t I2C_read_queue;
-EventGroupHandle_t I2C_events;
+volatile QueueHandle_t I2C_write_queue;
+volatile QueueHandle_t I2C_read_queue;
+volatile EventGroupHandle_t I2C_events;
 
-SemaphoreHandle_t I2C_done;
+volatile SemaphoreHandle_t I2C_done;
 
 
 #define I2C_free (1<< 0)
@@ -115,41 +115,13 @@ void I2C_transfer() {
 
         xQueueReceive(I2C_write_queue, &masterXfer, portMAX_DELAY);
 
+        xSemaphoreTake(I2C_done,portMAX_DELAY);
         xEventGroupWaitBits(I2C_events, I2C_free, pdTRUE, pdTRUE,
         portMAX_DELAY);
         I2C_MasterTransferNonBlocking(I2C1, &g_m_handle, masterXfer);
         xEventGroupWaitBits(I2C_events, I2C_free, pdFALSE, pdTRUE,
                portMAX_DELAY);
-        xQueueSend(I2C_read_queue,&masterXfer,portMAX_DELAY);
-
-    }
-
-}
-
-void I2C_prueba() {
-    i2c_master_transfer_t *masterXfer_write_read;
-    i2c_master_transfer_t *masterXfer_recibido;
-    uint8_t buffer_escritura[1] = {4};
-    masterXfer_write_read = pvPortMalloc(sizeof(i2c_master_transfer_t*));
-
-
-    //I2C_0 data block definition
-    masterXfer_write_read->slaveAddress = 0x50;
-    masterXfer_write_read->subaddress = 0x01;
-    masterXfer_write_read->subaddressSize = 2;
-    masterXfer_write_read->dataSize = 1;
-    masterXfer_write_read->flags = kI2C_TransferDefaultFlag;
-    masterXfer_write_read->direction = kI2C_Write;
-    masterXfer_write_read->data = buffer_escritura;
-
-    while (1)
-    {
-
-        xQueueSend(I2C_write_queue, &masterXfer_write_read, portMAX_DELAY);
-        xQueueReceive(I2C_read_queue, &masterXfer_write_read, portMAX_DELAY);
-
-
-        PRINTF("\r %i \n", masterXfer_write_read->data[0]);
+        xSemaphoreGive(I2C_done);
 
 
     }
@@ -159,13 +131,13 @@ void I2C_prueba() {
 void inicializacion_I2C(void) {
 
     I2C_events = xEventGroupCreate();
-    I2C_done = xSemaphoreCreateBinary();
+    I2C_done = xSemaphoreCreateMutex();
     I2C_write_queue = xQueueCreate(1, sizeof(i2c_master_transfer_t*));
     I2C_read_queue = xQueueCreate(1, sizeof(i2c_master_transfer_t*));
 
     xTaskCreate(I2CInit, "Init I2C", configMINIMAL_STACK_SIZE , NULL, 4,
     NULL);
     xTaskCreate(I2C_transfer, "transfer", configMINIMAL_STACK_SIZE, NULL,
-                        1, NULL);
+                        4, NULL);
 
 }
