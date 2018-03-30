@@ -38,6 +38,7 @@ extern QueueHandle_t SPI_queue;
 extern QueueHandle_t I2C_read_queue;
 extern QueueHandle_t I2C_write_queue;
 extern SemaphoreHandle_t I2C_done;
+extern SemaphoreHandle_t Interface_mutex;
 
 #define STRING_SIZE 77
 typedef struct {
@@ -391,8 +392,10 @@ void TerminalMenus_MainMenu(void* args) {
     {
         if (pdFALSE == firstEntryToMenu)
         {
+            xSemaphoreTake(Interface_mutex,portMAX_DELAY);
             firstEntryToMenu = pdTRUE;
             MenuPrinter(UART_struct, MainMenu); //TODO: identify which terminal is inside the function
+            xSemaphoreGive(Interface_mutex);
         }
         xQueueReceive(*UART_struct->UART_receive_Queue, &received_UART,
                       portMAX_DELAY);
@@ -437,8 +440,10 @@ void TerminalMenus_ReadMemory(void* args) {
         /**The task checks if it's the first time in the task, so that the menu is printed*/
         if (pdFALSE == firstEntryToMenu)
         {
+            xSemaphoreTake(Interface_mutex,portMAX_DELAY);
             firstEntryToMenu = pdTRUE;
             MenuPrinter(UART_struct, ReadMemoryI2C); //TODO: identify which terminal is inside the function
+            xSemaphoreGive(Interface_mutex);
         }
         xQueueReceive(*UART_struct->UART_receive_Queue, &received_UART,
                       portMAX_DELAY);
@@ -494,8 +499,10 @@ void TerminalMenus_WriteMemory(void* args) {
     {
         if (pdFALSE == firstEntryToMenu)
         {
+            xSemaphoreTake(Interface_mutex,portMAX_DELAY);
             firstEntryToMenu = pdTRUE;
             MenuPrinter(UART_struct, WriteMemoryI2C); //TODO: identify which terminal is inside the function
+            xSemaphoreGive(Interface_mutex);
         }
         xQueueReceive(*UART_struct->UART_receive_Queue, &received_UART,
                       portMAX_DELAY);
@@ -550,8 +557,10 @@ void TerminalMenus_EstablishRTCHour(void* args) {
         /**The task checks if it's the first time in the task, so that the menu is printed*/
         if (pdFALSE == firstEntryToMenu)
         {
+            xSemaphoreTake(Interface_mutex,portMAX_DELAY);
             firstEntryToMenu = pdTRUE;
             MenuPrinter(UART_struct, StablishHour); //TODO: identify which terminal is inside the function
+            xSemaphoreGive(Interface_mutex);
         }
         xQueueReceive(*UART_struct->UART_receive_Queue, &received_UART,
                       portMAX_DELAY);
@@ -580,8 +589,10 @@ void TerminalMenus_EstablishRTCDate(void* args) {
         /**The task checks if it's the first time in the task, so that the menu is printed*/
         if (pdFALSE == firstEntryToMenu)
         {
+            xSemaphoreTake(Interface_mutex,portMAX_DELAY);
             firstEntryToMenu = pdTRUE;
             MenuPrinter(UART_struct, StablishDate); //TODO: identify which terminal is inside the function
+            xSemaphoreGive(Interface_mutex);
         }
         xQueueReceive(*UART_struct->UART_receive_Queue, &received_UART,
                       portMAX_DELAY);
@@ -610,8 +621,10 @@ void TerminalMenus_EstablishRTCHourFormat(void* args) {
         /**The task checks if it's the first time in the task, so that the menu is printed*/
         if (pdFALSE == firstEntryToMenu)
         {
+            xSemaphoreTake(Interface_mutex,portMAX_DELAY);
             firstEntryToMenu = pdTRUE;
             MenuPrinter(UART_struct, TimeFormat); //TODO: identify which terminal is inside the function
+            xSemaphoreGive(Interface_mutex);
         }
         xQueueReceive(*UART_struct->UART_receive_Queue, &received_UART,
                       portMAX_DELAY);
@@ -639,8 +652,10 @@ void TerminalMenus_ReadRTCHour(void* args) {
         /**The task checks if it's the first time in the task, so that the menu is printed*/
         if (pdFALSE == firstEntryToMenu)
         {
+            xSemaphoreTake(Interface_mutex,portMAX_DELAY);
             firstEntryToMenu = pdTRUE;
             MenuPrinter(UART_struct, ReadHour); //TODO: identify which terminal is inside the function
+            xSemaphoreGive(Interface_mutex);
         }
         xQueueReceive(*UART_struct->UART_receive_Queue, &received_UART,
                       portMAX_DELAY);
@@ -668,8 +683,10 @@ void TerminalMenus_ReadRTCDate(void* args) {
         /**The task checks if it's the first time in the task, so that the menu is printed*/
         if (pdFALSE == firstEntryToMenu)
         {
+            xSemaphoreTake(Interface_mutex,portMAX_DELAY);
             firstEntryToMenu = pdTRUE;
             MenuPrinter(UART_struct, ReadDate); //TODO: identify which terminal is inside the function
+            xSemaphoreGive(Interface_mutex);
         }
         xQueueReceive(*UART_struct->UART_receive_Queue, &received_UART,
                       portMAX_DELAY);
@@ -697,8 +714,10 @@ void TerminalMenus_TerminalsCommunication(void* args) {
         /**The task checks if it's the first time in the task, so that the menu is printed*/
         if (pdFALSE == firstEntryToMenu)
         {
+            xSemaphoreTake(Interface_mutex,portMAX_DELAY);
             firstEntryToMenu = pdTRUE;
             MenuPrinter(UART_struct, Terminal2Communication); //TODO: identify which terminal is inside the function
+            xSemaphoreGive(Interface_mutex);
         }
         xQueueReceive(*UART_struct->UART_receive_Queue, &received_UART,
                       portMAX_DELAY);
@@ -731,8 +750,10 @@ void TerminalMenus_LCDEcho(void* args) {
         /**The task checks if it's the first time in the task, so that the menu is printed*/
         if (pdFALSE == firstEntryToMenu)
         {
+            xSemaphoreTake(Interface_mutex,portMAX_DELAY);
             firstEntryToMenu = pdTRUE;
             MenuPrinter(UART_struct, LCDEcho); //TODO: identify which terminal is inside the function
+            xSemaphoreGive(Interface_mutex);
         }
         xQueueReceive(*UART_struct->UART_receive_Queue, &received_UART,
                       portMAX_DELAY);

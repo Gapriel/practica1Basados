@@ -61,7 +61,7 @@ extern QueueHandle_t I2C_write_queue;
 extern QueueHandle_t I2C_read_queue;
 extern QueueHandle_t SPI_queue;
 extern SemaphoreHandle_t I2C_done;
-
+SemaphoreHandle_t Interface_mutex;
 static QueueHandle_t UART0_send_Queue;
 static QueueHandle_t UART0_receive_Queue;
 static uart_handle_t g_uart0Handle;
@@ -177,7 +177,7 @@ int main(void) {
   	/* Init FSL debug console. */
     BOARD_InitDebugConsole();
     uart_struct* p_UART_0_struct = &UART_0_struct;
-//    uart_struct* p_UART_1_struct = &UART_1_struct;
+    uart_struct* p_UART_1_struct = &UART_1_struct;
 
 
     xTaskCreate(SystemConfiguration, "CONFIG",configMINIMAL_STACK_SIZE,NULL,5,NULL);
@@ -185,14 +185,14 @@ int main(void) {
    SYSconfig_UARTConfiguration(p_UART_0_struct);
     UART_tasks((void*) p_UART_0_struct);
 
-//  SYSconfig_UARTConfiguration(p_UART_1_struct);
-//  UART_tasks((void*) p_UART_1_struct);
+  SYSconfig_UARTConfiguration(p_UART_1_struct);
+  UART_tasks((void*) p_UART_1_struct);
 
-
+    Interface_mutex = xSemaphoreCreateMutex();
     inicializacion_I2C();
    // xTaskCreate(print_eco_task, "ECO", configMINIMAL_STACK_SIZE, (void*)p_UART_0_struct, 2, NULL);
      xTaskCreate(TerminalMenus_MainMenu, "test menu 0", configMINIMAL_STACK_SIZE, (void*)p_UART_0_struct,4, NULL);
-  // xTaskCreate(TerminalMenus_MainMenu, "test menu 1", configMINIMAL_STACK_SIZE, (void*)p_UART_1_struct,4, NULL);
+     xTaskCreate(TerminalMenus_MainMenu, "test menu 1", configMINIMAL_STACK_SIZE, (void*)p_UART_1_struct,4, NULL);
 
     vTaskStartScheduler();
     while(1) {
