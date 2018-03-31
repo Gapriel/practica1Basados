@@ -35,6 +35,12 @@
 #define TensMask 0x30
 #define UnitsMask 0x0F
 #define YearsMask 0xC0
+#define TimeFormatMaskNegate 0x7F
+#define TimeFormatMaskSet 0x80
+#define AMFMBitMask 0x40
+#define MINUTESSECONDSLOW 0x0F
+#define MINUTESSECONDSHIGH 0xF0
+
 
 extern QueueHandle_t SPI_queue;
 extern QueueHandle_t I2C_read_queue;
@@ -389,6 +395,28 @@ void CheckIfLineMovementAndUartEcho(uart_struct* UART_struct,
     }
 }
 
+uint16_t ASCII_TO_uint8_t(uint8_t fifo_number, uint8_t fifo_pops)
+{
+    uint8_t ascii_address_index;
+    uint16_t address = 0;
+    uint8_t fifo_value;
+    for (ascii_address_index = 0; ascii_address_index < fifo_pops;
+            ascii_address_index++)
+    {
+        fifo_value = FIFO_pop(fifo_number);
+        if (('0' <= fifo_value) && (fifo_value <= '9'))
+        {
+            fifo_value -= '0';
+        } else if (('A' <= fifo_value) && (fifo_value <= 'F'))
+        {
+            fifo_value -= ('A' - 10);
+        }
+        address += (fifo_value << (4 * (fifo_pops - ascii_address_index - 1)));
+    }
+    FIFO_pop(fifo_number);
+    return address;
+}
+
 //////////////////////////////////////////MENUS FUNCTIONS BODIES////////////////////////////////////////////
 void TerminalMenus_MainMenu(void* args)
 {
@@ -413,28 +441,6 @@ void TerminalMenus_MainMenu(void* args)
         vPortFree(received_UART);
         vTaskDelete(NULL);
     }
-}
-
-uint16_t ASCII_TO_uint8_t(uint8_t fifo_number, uint8_t fifo_pops)
-{
-    uint8_t ascii_address_index;
-    uint16_t address = 0;
-    uint8_t fifo_value;
-    for (ascii_address_index = 0; ascii_address_index < fifo_pops;
-            ascii_address_index++)
-    {
-        fifo_value = FIFO_pop(fifo_number);
-        if (('0' <= fifo_value) && (fifo_value <= '9'))
-        {
-            fifo_value -= '0';
-        } else if (('A' <= fifo_value) && (fifo_value <= 'F'))
-        {
-            fifo_value -= ('A' - 10);
-        }
-        address += (fifo_value << (4 * (fifo_pops - ascii_address_index - 1)));
-    }
-    FIFO_pop(fifo_number);
-    return address;
 }
 
 void TerminalMenus_ReadMemory(void* args)
@@ -712,6 +718,46 @@ void TerminalMenus_EstablishRTCHourFormat(void* args)
         CheckIfReturnToMenu(UART_struct, charReceived);
         CheckIfLineMovementAndUartEcho(UART_struct, charReceived, &LineMover);
 
+        if (0 == LineMover.menuPositionLineIndex)
+        {
+            uint8_t timeFormat = 0;
+            uint8_t readBuffer = 0;
+            i2c_master_transfer_t *masterXfer_I2C_write;
+            masterXfer_I2C_write = pvPortMalloc(sizeof(i2c_master_transfer_t*));
+            uint16_t subaddress = 0x04;/* segundos;*/
+            masterXfer_I2C_write->data = &readBuffer;
+            masterXfer_I2C_write->dataSize = 1;
+            masterXfer_I2C_write->direction = kI2C_Read;
+            masterXfer_I2C_write->flags = kI2C_TransferDefaultFlag;
+            masterXfer_I2C_write->slaveAddress = 0x50;
+            masterXfer_I2C_write->subaddress = (uint32_t) subaddress;
+            masterXfer_I2C_write->subaddressSize = 1;
+            xQueueSend(I2C_write_queue, &masterXfer_I2C_write, portMAX_DELAY);
+            xSemaphoreTake(I2C_done, portMAX_DELAY);
+            xSemaphoreGive(I2C_done);
+            if ('1' == charReceived)
+            {
+                timeFormat = readBuffer | TimeFormatMaskSet;
+            } else
+            {
+                timeFormat = readBuffer & TimeFormatMaskNegate;
+            }
+
+            masterXfer_I2C_write->data = &timeFormat;
+            masterXfer_I2C_write->dataSize = 1;
+            masterXfer_I2C_write->direction = kI2C_Write;
+            masterXfer_I2C_write->flags = kI2C_TransferDefaultFlag;
+            masterXfer_I2C_write->slaveAddress = 0x50;
+            masterXfer_I2C_write->subaddress = (uint32_t) subaddress;
+            masterXfer_I2C_write->subaddressSize = 1;
+
+            xQueueSend(I2C_write_queue, &masterXfer_I2C_write, portMAX_DELAY);
+            xSemaphoreTake(I2C_done, portMAX_DELAY);
+            xSemaphoreGive(I2C_done);
+            vTaskDelay(pdMS_TO_TICKS(50));
+            vPortFree(masterXfer_I2C_write);
+        }
+
         vPortFree(received_UART); //the previously reserved memory used for the UART capture is liberated
     }
 }
@@ -758,7 +804,7 @@ void TerminalMenus_ReadRTCHour(void* args)
             i2c_master_transfer_t *masterXfer_I2C_write;
             uint8_t index;
             uint16_t subaddress = 0x02;
-            for (index; index < 3; index++)
+            for (index=0; index < 3; index++)
             {
                 masterXfer_I2C_write = pvPortMalloc(
                         sizeof(i2c_master_transfer_t*));
@@ -777,18 +823,16 @@ void TerminalMenus_ReadRTCHour(void* args)
                 vPortFree(masterXfer_I2C_write);
                 subaddress++;
             }
-            printing_time_chars[0] = ((time_buffer_variable[2] & TensMask)
-                    >> 4) + '0'; /**hours tens*/
+            printing_time_chars[0] = ((time_buffer_variable[2] & TensMask) >> 4)
+                    + '0'; /**hours tens*/
             printing_time_chars[1] = (time_buffer_variable[2] & UnitsMask)
                     + '0';
             printing_time_chars[2] = ':';
-            printing_time_chars[3] = (time_buffer_variable[1] / 10) + '0';
-            printing_time_chars[4] = ((time_buffer_variable[1])
-                    - ((printing_time_chars[3] - '0') * 10)) + '0';
+            printing_time_chars[3] = ((time_buffer_variable[1] & MINUTESSECONDSHIGH)>>4) + '0';
+            printing_time_chars[4] = (time_buffer_variable[1] & MINUTESSECONDSLOW) +'0';
             printing_time_chars[5] = ':';
-            printing_time_chars[6] = (time_buffer_variable[0] / 10) + '0';
-            printing_time_chars[7] = ((time_buffer_variable[0])
-                    - ((printing_time_chars[6] - '0') * 10)) + '0';
+            printing_time_chars[6] = ((time_buffer_variable[0] & MINUTESSECONDSHIGH)>>4) + '0';
+            printing_time_chars[7] = (time_buffer_variable[0] & MINUTESSECONDSLOW) + '0';
             printing_time_chars[8] = '\0';
 
             uart_transfer_t* toSend_UART;
@@ -806,7 +850,7 @@ void TerminalMenus_ReadRTCHour(void* args)
             uint8_t HRS[] = { "HRS" };
             if (pdTRUE == (time_buffer_variable[2] >> 7))
             {
-                if (pdTRUE == (((time_buffer_variable[2] >> 6) & 0x2) >> 1))
+                if (pdTRUE == ((AMFMBitMask & time_buffer_variable[2])>>6))
                 {
                     toSend_UART->data = PM;
                 } else
@@ -875,7 +919,7 @@ void TerminalMenus_ReadRTCDate(void* args)
             i2c_master_transfer_t *masterXfer_I2C_write;
             uint8_t index;
             uint16_t subaddress = 0x05;
-            for (index; index < 2; index++)
+            for (index=0; index < 2; index++)
             {
                 masterXfer_I2C_write = pvPortMalloc(
                         sizeof(i2c_master_transfer_t*));
@@ -908,7 +952,6 @@ void TerminalMenus_ReadRTCDate(void* args)
             printing_time_chars[7] = (time_buffer_variable[0] & YearsMask >> 6)
                     + '0';
             printing_time_chars[8] = '\0';
-
 
             uart_transfer_t* toSend_UART;
             toSend_UART = pvPortMalloc(sizeof(uart_transfer_t*));
