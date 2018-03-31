@@ -49,7 +49,7 @@
 #include "FreeRTOSConfig.h"
 #include "I2C_no_bloqueante.h"
 
-static i2c_master_handle_t g_m_handle; //I2C_0 master handler declared
+volatile i2c_master_handle_t g_m_handle; //I2C_0 master handler declared
 
 volatile QueueHandle_t I2C_write_queue;
 volatile QueueHandle_t I2C_read_queue;
@@ -100,6 +100,7 @@ void I2CInit() {
     NVIC_EnableIRQ(I2C1_IRQn);
     NVIC_SetPriority(I2C1_IRQn, 6);
     xEventGroupSetBits(I2C_events, I2C_free);
+    xSemaphoreGive(I2C_done);
     vTaskDelete(NULL);
 
 }
@@ -122,6 +123,7 @@ void I2C_transfer() {
         xEventGroupWaitBits(I2C_events, I2C_free, pdFALSE, pdTRUE,
                portMAX_DELAY);
         xSemaphoreGive(I2C_done);
+        vPortFree(masterXfer);
     }
 
 }
@@ -130,6 +132,7 @@ void inicializacion_I2C(void) {
 
     I2C_events = xEventGroupCreate();
     I2C_done = xSemaphoreCreateMutex();
+
     I2C_write_queue = xQueueCreate(1, sizeof(i2c_master_transfer_t*));
     I2C_read_queue = xQueueCreate(1, sizeof(i2c_master_transfer_t*));
 

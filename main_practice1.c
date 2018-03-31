@@ -61,17 +61,18 @@ extern QueueHandle_t I2C_write_queue;
 extern QueueHandle_t I2C_read_queue;
 extern QueueHandle_t SPI_queue;
 extern SemaphoreHandle_t I2C_done;
+
 SemaphoreHandle_t Interface_mutex;
-static QueueHandle_t UART0_send_Queue;
-static QueueHandle_t UART0_receive_Queue;
-static uart_handle_t g_uart0Handle;
-static EventGroupHandle_t g_UART0_Events;
+volatile QueueHandle_t UART0_send_Queue;
+volatile QueueHandle_t UART0_receive_Queue;
+volatile uart_handle_t g_uart0Handle;
+volatile EventGroupHandle_t g_UART0_Events;
 
 
-static QueueHandle_t UART1_send_Queue;
-static QueueHandle_t UART1_receive_Queue;
-static uart_handle_t g_uart1Handle;
-static EventGroupHandle_t g_UART1_Events;
+volatile QueueHandle_t UART1_send_Queue;
+volatile QueueHandle_t UART1_receive_Queue;
+volatile uart_handle_t g_uart1Handle;
+volatile EventGroupHandle_t g_UART1_Events;
 
 
 static uart_struct UART_0_struct = {

@@ -65,8 +65,7 @@ typedef struct {
     uint8_t validCharacter;
 } LineMovementPack_t;
 
-void PORTA_IRQHandler()
-{
+void PORTA_IRQHandler() {
     uint32_t InterruptFlags;
 
     InterruptFlags = GPIO_GetPinsInterruptFlags(GPIOA);
@@ -87,8 +86,7 @@ void PORTA_IRQHandler()
 
 }
 
-void PORTB_IRQHandler()
-{
+void PORTB_IRQHandler() {
     uint32_t InterruptFlags;
 
     InterruptFlags = GPIO_GetPinsInterruptFlags(GPIOB);
@@ -178,8 +176,7 @@ static TerminalMenuType_t Menus[MENUS_QUANTITY] = { //menus strings to be displa
                 "Presione 2 veces = para continuar...", "\033[12;08H" } } } };
 
 /////////////////////////////////////////MECHANISMS DEFINITIONS/////////////////////////////////////////////
-void MenuPrinter(uart_struct* uart_struct, uint8_t menuToBePrinted)
-{
+void MenuPrinter(uart_struct* uart_struct, uint8_t menuToBePrinted) {
 
     uart_transfer_t* toSend_UART;
     uint8_t printedStringIndex = 0;
@@ -214,8 +211,7 @@ void MenuPrinter(uart_struct* uart_struct, uint8_t menuToBePrinted)
 }
 
 void CharacterValidator(LineMovementPack_t *Pack, uint8_t menuToBePrinted,
-                        uint8_t receivedChar)
-{
+                        uint8_t receivedChar) {
 
     switch (menuToBePrinted)
     {
@@ -265,13 +261,12 @@ void CharacterValidator(LineMovementPack_t *Pack, uint8_t menuToBePrinted,
 
 }
 
-void CreateMenuTask(uart_struct* uart_struct, uint8_t menuToBeCreated)
-{
+void CreateMenuTask(uart_struct* uart_struct, uint8_t menuToBeCreated) {
     switch (menuToBeCreated)
     {
         case ReadMemoryI2C:
             xTaskCreate(TerminalMenus_ReadMemory, "Read Memory Menu",
-            configMINIMAL_STACK_SIZE + 50,
+            configMINIMAL_STACK_SIZE,
                         (void*) uart_struct, 3, NULL);
 
         break;
@@ -323,21 +318,19 @@ void CreateMenuTask(uart_struct* uart_struct, uint8_t menuToBeCreated)
         break;
     }
 }
-void CheckIfReturnToMenu(uart_struct* uart_struct, uint8_t receivedChar)
-{
+void CheckIfReturnToMenu(uart_struct* uart_struct, uint8_t receivedChar) {
     if (RETURN == receivedChar)
     {
         xTaskCreate(TerminalMenus_MainMenu, "menu task",
         configMINIMAL_STACK_SIZE,
-                    (void*) uart_struct, 1, NULL); //create menu task
+                    (void*) uart_struct, 3, NULL); //create menu task
         vTaskDelete(NULL);  //deletes current task
     }
 }
 
 void CheckIfLineMovementAndUartEcho(uart_struct* UART_struct,
                                     uint8_t receivedChar,
-                                    LineMovementPack_t * lineMoverPack)
-{
+                                    LineMovementPack_t * lineMoverPack) {
     uart_transfer_t* toSend_UART;
     if (((lineMoverPack->charactersPerInputSpace[lineMoverPack->menuPositionLineIndex]
             <= lineMoverPack->linePositionIndex) && (ENTER == receivedChar))
@@ -394,31 +387,8 @@ void CheckIfLineMovementAndUartEcho(uart_struct* UART_struct,
     }
 }
 
-uint16_t ASCII_TO_uint8_t(uint8_t fifo_number, uint8_t fifo_pops)
-{
-    uint8_t ascii_address_index;
-    uint16_t address = 0;
-    uint8_t fifo_value;
-    for (ascii_address_index = 0; ascii_address_index < fifo_pops;
-            ascii_address_index++)
-    {
-        fifo_value = FIFO_pop(fifo_number);
-        if (('0' <= fifo_value) && (fifo_value <= '9'))
-        {
-            fifo_value -= '0';
-        } else if (('A' <= fifo_value) && (fifo_value <= 'F'))
-        {
-            fifo_value -= ('A' - 10);
-        }
-        address += (fifo_value << (4 * (fifo_pops - ascii_address_index - 1)));
-    }
-    FIFO_pop(fifo_number);
-    return address;
-}
-
 //////////////////////////////////////////MENUS FUNCTIONS BODIES////////////////////////////////////////////
-void TerminalMenus_MainMenu(void* args)
-{
+void TerminalMenus_MainMenu(void* args) {
     uart_struct* UART_struct = (uart_struct*) args;
     uint8_t firstEntryToMenu = pdFALSE;
     uart_transfer_t* received_UART;
@@ -442,8 +412,28 @@ void TerminalMenus_MainMenu(void* args)
     }
 }
 
-void TerminalMenus_ReadMemory(void* args)
-{
+uint16_t ASCII_TO_uint8_t(uint8_t fifo_number, uint8_t fifo_pops) {
+    uint8_t ascii_address_index;
+    uint16_t address = 0;
+    uint8_t fifo_value;
+    for (ascii_address_index = 0; ascii_address_index < fifo_pops;
+            ascii_address_index++)
+    {
+        fifo_value = FIFO_pop(fifo_number);
+        if (('0' <= fifo_value) && (fifo_value <= '9'))
+        {
+            fifo_value -= '0';
+        } else if (('A' <= fifo_value) && (fifo_value <= 'F'))
+        {
+            fifo_value -= ('A' - 10);
+        }
+        address += (fifo_value << (4 * (fifo_pops - ascii_address_index - 1)));
+    }
+    FIFO_pop(fifo_number);
+    return address;
+}
+
+void TerminalMenus_ReadMemory(void* args) {
     uart_struct* UART_struct = (uart_struct*) args;
     uint8_t firstEntryToMenu = pdFALSE;
     uart_transfer_t* received_UART;
@@ -466,13 +456,14 @@ void TerminalMenus_ReadMemory(void* args)
         xQueueReceive(*UART_struct->UART_receive_Queue, &received_UART,
                       portMAX_DELAY);
         charReceived = *received_UART->data;
+        vPortFree(received_UART);
+
         CharacterValidator(&LineMover, ReadMemoryI2C, charReceived);
         CheckIfReturnToMenu(UART_struct, charReceived);
         CheckIfLineMovementAndUartEcho(UART_struct, charReceived, &LineMover);
-
         if (2 <= LineMover.menuPositionLineIndex)
         {
-            i2c_master_transfer_t *masterXfer_I2C_read;
+            i2c_master_transfer_t *masterXfer_I2C_read; // = &dummy_i2c;
             masterXfer_I2C_read = pvPortMalloc(sizeof(i2c_master_transfer_t*));
             uint8_t BytesToRead = (uint8_t) ASCII_TO_uint8_t(1, 2);
             uint16_t subaddress = ASCII_TO_uint8_t(0, 4);
@@ -485,11 +476,11 @@ void TerminalMenus_ReadMemory(void* args)
             masterXfer_I2C_read->subaddress = (uint32_t) subaddress;
             masterXfer_I2C_read->subaddressSize = 2;
             read_buffer[BytesToRead] = '\0';
-            xSemaphoreGive(I2C_done);
 
             xQueueSend(I2C_write_queue, &masterXfer_I2C_read, portMAX_DELAY);
             xSemaphoreTake(I2C_done, portMAX_DELAY);
             xSemaphoreGive(I2C_done);
+            vTaskDelay(pdMS_TO_TICKS(100));
             uart_transfer_t* toSend_UART;
             toSend_UART = pvPortMalloc(sizeof(uart_transfer_t*));
             toSend_UART->data = read_buffer;
@@ -497,14 +488,10 @@ void TerminalMenus_ReadMemory(void* args)
             xQueueSend(*UART_struct->UART_send_Queue, &toSend_UART,
                        portMAX_DELAY);
             vTaskDelay(pdMS_TO_TICKS(50));
-            vPortFree(masterXfer_I2C_read);
-        } else
-            vPortFree(received_UART); //the previously reserved memory used for the UART capture is liberated
+        }
     }
 }
-
-void TerminalMenus_WriteMemory(void* args)
-{
+void TerminalMenus_WriteMemory(void* args) {
 
     uart_struct* UART_struct = (uart_struct*) args;
     uint8_t firstEntryToMenu = pdFALSE;
@@ -527,6 +514,7 @@ void TerminalMenus_WriteMemory(void* args)
         xQueueReceive(*UART_struct->UART_receive_Queue, &received_UART,
                       portMAX_DELAY);
         charReceived = *received_UART->data;
+        vPortFree(received_UART);
 
         CharacterValidator(&LineMover, WriteMemoryI2C, charReceived);
         CheckIfReturnToMenu(UART_struct, charReceived);
@@ -550,16 +538,13 @@ void TerminalMenus_WriteMemory(void* args)
             xSemaphoreTake(I2C_done, portMAX_DELAY);
             xSemaphoreGive(I2C_done);
             vTaskDelay(pdMS_TO_TICKS(50));
-            vPortFree(masterXfer_I2C_write);
 
-        } else
+        }
 
-            vPortFree(received_UART); //the previously reserved memory used for the UART capture is liberated
     }
 }
 
-void TerminalMenus_EstablishRTCHour(void* args)
-{
+void TerminalMenus_EstablishRTCHour(void* args) {
 
     uint8_t hours = 0;
     uint8_t minutes = 0;
@@ -587,7 +572,7 @@ void TerminalMenus_EstablishRTCHour(void* args)
         xQueueReceive(*UART_struct->UART_receive_Queue, &received_UART,
                       portMAX_DELAY);
         charReceived = *received_UART->data;
-
+        vPortFree(received_UART);
         CharacterValidator(&LineMover, StablishHour, charReceived);
         CheckIfReturnToMenu(UART_struct, charReceived);
         CheckIfLineMovementAndUartEcho(UART_struct, charReceived, &LineMover);
@@ -618,6 +603,8 @@ void TerminalMenus_EstablishRTCHour(void* args)
             xSemaphoreTake(I2C_done, portMAX_DELAY);
             xSemaphoreGive(I2C_done);
 
+            vTaskDelay(pdMS_TO_TICKS(50));
+            masterXfer_I2C_write = pvPortMalloc(sizeof(i2c_master_transfer_t*));
             subaddress = 0x03;
             masterXfer_I2C_write->data = &minutes;
             masterXfer_I2C_write->dataSize = 1;
@@ -627,12 +614,17 @@ void TerminalMenus_EstablishRTCHour(void* args)
             masterXfer_I2C_write->subaddress = (uint32_t) subaddress;
             masterXfer_I2C_write->subaddressSize = 1;
 
+            vTaskDelay(pdMS_TO_TICKS(50));
             xQueueSend(I2C_write_queue, &masterXfer_I2C_write, portMAX_DELAY);
             xSemaphoreTake(I2C_done, portMAX_DELAY);
             xSemaphoreGive(I2C_done);
 
+            vTaskDelay(pdMS_TO_TICKS(50));
+            masterXfer_I2C_write = pvPortMalloc(sizeof(i2c_master_transfer_t*));
             subaddress = 0x04;
+
             uint8_t readBuffer = 0;
+            uint8_t Hours = 0;
             masterXfer_I2C_write->data = &readBuffer;
             masterXfer_I2C_write->dataSize = 1;
             masterXfer_I2C_write->direction = kI2C_Read;
@@ -646,7 +638,6 @@ void TerminalMenus_EstablishRTCHour(void* args)
 
             readBuffer = readBuffer & 0xC0;
 
-            uint8_t Hours = 0;
             Hours = (readBuffer) | (time_buffer[0] << 4);
             Hours += time_buffer[1];
             masterXfer_I2C_write->data = &Hours;
@@ -661,16 +652,12 @@ void TerminalMenus_EstablishRTCHour(void* args)
             xSemaphoreTake(I2C_done, portMAX_DELAY);
             xSemaphoreGive(I2C_done);
             vTaskDelay(pdMS_TO_TICKS(50));
-            vPortFree(masterXfer_I2C_write);
-        } else
-        {
-            vPortFree(received_UART); //the previously reserved memory used for the UART capture is liberated
+
         }
     }
 }
 
-void TerminalMenus_EstablishRTCDate(void* args)
-{
+void TerminalMenus_EstablishRTCDate(void* args) {
 
     uart_struct* UART_struct = (uart_struct*) args;
     uint8_t firstEntryToMenu = pdFALSE;
@@ -693,17 +680,36 @@ void TerminalMenus_EstablishRTCDate(void* args)
         xQueueReceive(*UART_struct->UART_receive_Queue, &received_UART,
                       portMAX_DELAY);
         charReceived = *received_UART->data;
+        vPortFree(received_UART);
 
         CharacterValidator(&LineMover, StablishDate, charReceived);
         CheckIfReturnToMenu(UART_struct, charReceived);
         CheckIfLineMovementAndUartEcho(UART_struct, charReceived, &LineMover);
 
-        vPortFree(received_UART); //the previously reserved memory used for the UART capture is liberated
+        if (1 == LineMover.menuPositionLineIndex)
+        {
+
+            /*
+             masterXfer_I2C_write = pvPortMalloc(sizeof(i2c_master_transfer_t*));
+             masterXfer_I2C_write->data = &timeFormat;
+             masterXfer_I2C_write->dataSize = 1;
+             masterXfer_I2C_write->direction = kI2C_Write;
+             masterXfer_I2C_write->flags = kI2C_TransferDefaultFlag;
+             masterXfer_I2C_write->slaveAddress = 0x50;
+             masterXfer_I2C_write->subaddress = (uint32_t) subaddress;
+             masterXfer_I2C_write->subaddressSize = 1;
+
+             xQueueSend(I2C_write_queue, &masterXfer_I2C_write, portMAX_DELAY);
+             xSemaphoreTake(I2C_done, portMAX_DELAY);
+             xSemaphoreGive(I2C_done);
+             vTaskDelay(pdMS_TO_TICKS(100));
+             */
+        }
+
     }
 }
 
-void TerminalMenus_EstablishRTCHourFormat(void* args)
-{
+void TerminalMenus_EstablishRTCHourFormat(void* args) {
 
     uart_struct* UART_struct = (uart_struct*) args;
     uint8_t firstEntryToMenu = pdFALSE;
@@ -726,12 +732,13 @@ void TerminalMenus_EstablishRTCHourFormat(void* args)
         xQueueReceive(*UART_struct->UART_receive_Queue, &received_UART,
                       portMAX_DELAY);
         charReceived = *received_UART->data;
+        vPortFree(received_UART);
 
         CharacterValidator(&LineMover, TimeFormat, charReceived);
         CheckIfReturnToMenu(UART_struct, charReceived);
         CheckIfLineMovementAndUartEcho(UART_struct, charReceived, &LineMover);
 
-        if (0 == LineMover.menuPositionLineIndex)
+        if (1 == LineMover.menuPositionLineIndex)
         {
             uint8_t timeFormat = 0;
             uint8_t readBuffer = 0;
@@ -748,7 +755,10 @@ void TerminalMenus_EstablishRTCHourFormat(void* args)
             xQueueSend(I2C_write_queue, &masterXfer_I2C_write, portMAX_DELAY);
             xSemaphoreTake(I2C_done, portMAX_DELAY);
             xSemaphoreGive(I2C_done);
-            if ('1' == charReceived)
+
+            vTaskDelay(pdMS_TO_TICKS(20));
+
+            if ('1' == (FIFO_pop(0)))
             {
                 timeFormat = readBuffer | TimeFormatMaskSet;
             } else
@@ -756,6 +766,7 @@ void TerminalMenus_EstablishRTCHourFormat(void* args)
                 timeFormat = readBuffer & TimeFormatMaskNegate;
             }
 
+            masterXfer_I2C_write = pvPortMalloc(sizeof(i2c_master_transfer_t*));
             masterXfer_I2C_write->data = &timeFormat;
             masterXfer_I2C_write->dataSize = 1;
             masterXfer_I2C_write->direction = kI2C_Write;
@@ -767,30 +778,31 @@ void TerminalMenus_EstablishRTCHourFormat(void* args)
             xQueueSend(I2C_write_queue, &masterXfer_I2C_write, portMAX_DELAY);
             xSemaphoreTake(I2C_done, portMAX_DELAY);
             xSemaphoreGive(I2C_done);
-            vTaskDelay(pdMS_TO_TICKS(50));
-            vPortFree(masterXfer_I2C_write);
+            vTaskDelay(pdMS_TO_TICKS(100));
+
         }
 
-        vPortFree(received_UART); //the previously reserved memory used for the UART capture is liberated
     }
 }
 
-void TerminalMenus_ReadRTCHour(void* args)
-{
+void TerminalMenus_ReadRTCHour(void* args) {
 
     TickType_t xLastWakeTime;
     const TickType_t xPeriod = pdMS_TO_TICKS(1000);
     uart_struct* UART_struct = (uart_struct*) args;
     uint8_t firstEntryToMenu = pdFALSE;
-    uart_transfer_t* received_UART;
+    uart_transfer_t dummy_uart = { 0, 1 };
     uint8_t charReceived = 0;
     uint8_t time_buffer_variable[3];
     uint8_t printing_time_chars[9];
     LineMovementPack_t LineMover = { 0, 0, 1,
     pdFALSE, { pdTRUE, pdTRUE, pdTRUE }, { { { "\033[11;10H" } } }, //struct with constant position reference used in memory read menu
         { 0, 0 } };
+    volatile uart_transfer_t* received_UART = NULL;
+
     for (;;)
     {
+
         xLastWakeTime = xTaskGetTickCount();
         /**The task checks if it's the first time in the task, so that the menu is printed*/
         if (pdFALSE == firstEntryToMenu)
@@ -800,12 +812,14 @@ void TerminalMenus_ReadRTCHour(void* args)
             MenuPrinter(UART_struct, ReadHour); //TODO: identify which terminal is inside the function
             xSemaphoreGive(Interface_mutex);
         }
-        xQueueReceive(*UART_struct->UART_receive_Queue, &received_UART, 0);
 
-        charReceived = *received_UART->data;
-        if (0 != charReceived)
+        if (pdPASS
+                == xQueueReceive(*UART_struct->UART_receive_Queue,
+                                 &received_UART, 0))
         {
-            //vPortFree(received_UART);
+
+            charReceived = *received_UART->data;
+            //  vPortFree( &received_UART);
             CharacterValidator(&LineMover, ReadHour, charReceived);
             CheckIfReturnToMenu(UART_struct, charReceived);
             CheckIfLineMovementAndUartEcho(UART_struct, charReceived,
@@ -833,7 +847,6 @@ void TerminalMenus_ReadRTCHour(void* args)
                 xSemaphoreTake(I2C_done, portMAX_DELAY);
                 xSemaphoreGive(I2C_done);
                 vTaskDelay(pdMS_TO_TICKS(100));
-                vPortFree(masterXfer_I2C_write);
                 subaddress++;
             }
             printing_time_chars[0] = ((time_buffer_variable[2] & TensMask) >> 4)
@@ -862,12 +875,12 @@ void TerminalMenus_ReadRTCHour(void* args)
 
             toSend_UART = pvPortMalloc(sizeof(uart_transfer_t*));
 
-            uint8_t AM[] = { "AM" };
-            uint8_t PM[] = { "PM" };
-            uint8_t HRS[] = { "HRS" };
+            uint8_t AM[] = { "  AM" };
+            uint8_t PM[] = { "  PM" };
+            uint8_t HRS[] = { "  HRS" };
             if (pdTRUE == (time_buffer_variable[2] >> 7))
             {
-                if (pdTRUE == ((AMFMBitMask & time_buffer_variable[2]) >> 6))
+                if (pdTRUE == (((time_buffer_variable[2] >> 6) & 0x1)))
                 {
                     toSend_UART->data = PM;
                 } else
@@ -894,14 +907,13 @@ void TerminalMenus_ReadRTCHour(void* args)
     }
 }
 
-void TerminalMenus_ReadRTCDate(void* args)
-{
+void TerminalMenus_ReadRTCDate(void* args) {
 
     TickType_t xLastWakeTime;
     const TickType_t xPeriod = pdMS_TO_TICKS(1000);
     uart_struct* UART_struct = (uart_struct*) args;
     uint8_t firstEntryToMenu = pdFALSE;
-    uart_transfer_t* received_UART;
+    uart_transfer_t dummy_uart = { 0, 1 };
     uint8_t charReceived = 0;
     uint8_t time_buffer_variable[3];
     uint8_t printing_time_chars[9];
@@ -910,6 +922,8 @@ void TerminalMenus_ReadRTCDate(void* args)
         { 0, 0 } };
     for (;;)
     {
+
+        uart_transfer_t* received_UART = &dummy_uart;
         xLastWakeTime = xTaskGetTickCount();
         /**The task checks if it's the first time in the task, so that the menu is printed*/
         if (pdFALSE == firstEntryToMenu)
@@ -924,7 +938,7 @@ void TerminalMenus_ReadRTCDate(void* args)
         charReceived = *received_UART->data;
         if (0 != charReceived)
         {
-            //vPortFree(received_UART);
+            // vPortFree(received_UART);
             CharacterValidator(&LineMover, ReadDate, charReceived);
             CheckIfReturnToMenu(UART_struct, charReceived);
             CheckIfLineMovementAndUartEcho(UART_struct, charReceived,
@@ -936,7 +950,7 @@ void TerminalMenus_ReadRTCDate(void* args)
             i2c_master_transfer_t *masterXfer_I2C_write;
             uint8_t index;
             uint16_t subaddress = 0x05;
-            for (index = 0; index < 2; index++)
+            for (index; index < 2; index++)
             {
                 masterXfer_I2C_write = pvPortMalloc(
                         sizeof(i2c_master_transfer_t*));
@@ -951,8 +965,7 @@ void TerminalMenus_ReadRTCDate(void* args)
                            portMAX_DELAY);
                 xSemaphoreTake(I2C_done, portMAX_DELAY);
                 xSemaphoreGive(I2C_done);
-                vTaskDelay(pdMS_TO_TICKS(100));
-                vPortFree(masterXfer_I2C_write);
+                vTaskDelay(pdMS_TO_TICKS(50));
                 subaddress++;
             }
             printing_time_chars[0] = ((time_buffer_variable[0] & TensMask) >> 4)
@@ -989,8 +1002,7 @@ void TerminalMenus_ReadRTCDate(void* args)
     }
 }
 
-void TerminalMenus_TerminalsCommunication(void* args)
-{
+void TerminalMenus_TerminalsCommunication(void* args) {
 
     uart_struct* UART_struct = (uart_struct*) args;
     uint8_t firstEntryToMenu = pdFALSE;
@@ -1012,6 +1024,8 @@ void TerminalMenus_TerminalsCommunication(void* args)
         xQueueReceive(*UART_struct->UART_receive_Queue, &received_UART,
                       portMAX_DELAY);
         charReceived = *received_UART->data;
+        vPortFree(received_UART); //the previously reserved memory used for the UART capture is liberated
+
         if (ENTER != charReceived)
         {
 
@@ -1022,12 +1036,10 @@ void TerminalMenus_TerminalsCommunication(void* args)
                                            &LineMover);
         }
 
-        vPortFree(received_UART); //the previously reserved memory used for the UART capture is liberated
     }
 }
 
-void TerminalMenus_LCDEcho(void* args)
-{
+void TerminalMenus_LCDEcho(void* args) {
 
     uart_struct* UART_struct = (uart_struct*) args;
     SPI_msg_t *charToBeMirrored;
@@ -1050,6 +1062,8 @@ void TerminalMenus_LCDEcho(void* args)
         xQueueReceive(*UART_struct->UART_receive_Queue, &received_UART,
                       portMAX_DELAY);
         charReceived = *received_UART->data;
+        vPortFree(received_UART);
+
         if (RETURN == charReceived)
         {
             charToBeMirrored = pvPortMalloc(sizeof(SPI_msg_t*));
@@ -1073,6 +1087,6 @@ void TerminalMenus_LCDEcho(void* args)
             xQueueSend(SPI_queue, &charToBeMirrored, portMAX_DELAY);
         }
 
-        vPortFree(received_UART); //the previously reserved memory used for the UART capture is liberated
     }
 }
+
