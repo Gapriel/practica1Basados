@@ -65,7 +65,8 @@ typedef struct {
     uint8_t validCharacter;
 } LineMovementPack_t;
 
-void PORTA_IRQHandler() {
+void PORTA_IRQHandler()
+{
     uint32_t InterruptFlags;
 
     InterruptFlags = GPIO_GetPinsInterruptFlags(GPIOA);
@@ -86,7 +87,8 @@ void PORTA_IRQHandler() {
 
 }
 
-void PORTB_IRQHandler() {
+void PORTB_IRQHandler()
+{
     uint32_t InterruptFlags;
 
     InterruptFlags = GPIO_GetPinsInterruptFlags(GPIOB);
@@ -176,7 +178,8 @@ static TerminalMenuType_t Menus[MENUS_QUANTITY] = { //menus strings to be displa
                 "Presione 2 veces = para continuar...", "\033[12;08H" } } } };
 
 /////////////////////////////////////////MECHANISMS DEFINITIONS/////////////////////////////////////////////
-void MenuPrinter(uart_struct* uart_struct, uint8_t menuToBePrinted) {
+void MenuPrinter(uart_struct* uart_struct, uint8_t menuToBePrinted)
+{
 
     uart_transfer_t* toSend_UART;
     uint8_t printedStringIndex = 0;
@@ -211,7 +214,8 @@ void MenuPrinter(uart_struct* uart_struct, uint8_t menuToBePrinted) {
 }
 
 void CharacterValidator(LineMovementPack_t *Pack, uint8_t menuToBePrinted,
-                        uint8_t receivedChar) {
+                        uint8_t receivedChar)
+{
 
     switch (menuToBePrinted)
     {
@@ -261,7 +265,8 @@ void CharacterValidator(LineMovementPack_t *Pack, uint8_t menuToBePrinted,
 
 }
 
-void CreateMenuTask(uart_struct* uart_struct, uint8_t menuToBeCreated) {
+void CreateMenuTask(uart_struct* uart_struct, uint8_t menuToBeCreated)
+{
     switch (menuToBeCreated)
     {
         case ReadMemoryI2C:
@@ -318,7 +323,8 @@ void CreateMenuTask(uart_struct* uart_struct, uint8_t menuToBeCreated) {
         break;
     }
 }
-void CheckIfReturnToMenu(uart_struct* uart_struct, uint8_t receivedChar) {
+void CheckIfReturnToMenu(uart_struct* uart_struct, uint8_t receivedChar)
+{
     if (RETURN == receivedChar)
     {
         xTaskCreate(TerminalMenus_MainMenu, "menu task",
@@ -330,7 +336,8 @@ void CheckIfReturnToMenu(uart_struct* uart_struct, uint8_t receivedChar) {
 
 void CheckIfLineMovementAndUartEcho(uart_struct* UART_struct,
                                     uint8_t receivedChar,
-                                    LineMovementPack_t * lineMoverPack) {
+                                    LineMovementPack_t * lineMoverPack)
+{
     uart_transfer_t* toSend_UART;
     if (((lineMoverPack->charactersPerInputSpace[lineMoverPack->menuPositionLineIndex]
             <= lineMoverPack->linePositionIndex) && (ENTER == receivedChar))
@@ -388,7 +395,8 @@ void CheckIfLineMovementAndUartEcho(uart_struct* UART_struct,
 }
 
 //////////////////////////////////////////MENUS FUNCTIONS BODIES////////////////////////////////////////////
-void TerminalMenus_MainMenu(void* args) {
+void TerminalMenus_MainMenu(void* args)
+{
     uart_struct* UART_struct = (uart_struct*) args;
     uint8_t firstEntryToMenu = pdFALSE;
     uart_transfer_t* received_UART;
@@ -412,7 +420,8 @@ void TerminalMenus_MainMenu(void* args) {
     }
 }
 
-uint16_t ASCII_TO_uint8_t(uint8_t fifo_number, uint8_t fifo_pops) {
+uint16_t ASCII_TO_uint8_t(uint8_t fifo_number, uint8_t fifo_pops)
+{
     uint8_t ascii_address_index;
     uint16_t address = 0;
     uint8_t fifo_value;
@@ -433,7 +442,8 @@ uint16_t ASCII_TO_uint8_t(uint8_t fifo_number, uint8_t fifo_pops) {
     return address;
 }
 
-void TerminalMenus_ReadMemory(void* args) {
+void TerminalMenus_ReadMemory(void* args)
+{
     uart_struct* UART_struct = (uart_struct*) args;
     uint8_t firstEntryToMenu = pdFALSE;
     uart_transfer_t* received_UART;
@@ -491,7 +501,8 @@ void TerminalMenus_ReadMemory(void* args) {
         }
     }
 }
-void TerminalMenus_WriteMemory(void* args) {
+void TerminalMenus_WriteMemory(void* args)
+{
 
     uart_struct* UART_struct = (uart_struct*) args;
     uint8_t firstEntryToMenu = pdFALSE;
@@ -544,7 +555,8 @@ void TerminalMenus_WriteMemory(void* args) {
     }
 }
 
-void TerminalMenus_EstablishRTCHour(void* args) {
+void TerminalMenus_EstablishRTCHour(void* args)
+{
 
     uint8_t hours = 0;
     uint8_t minutes = 0;
@@ -637,7 +649,7 @@ void TerminalMenus_EstablishRTCHour(void* args) {
             xSemaphoreGive(I2C_done);
 
             readBuffer = readBuffer & 0xC0;
-
+            masterXfer_I2C_write = pvPortMalloc(sizeof(i2c_master_transfer_t*));
             Hours = (readBuffer) | (time_buffer[0] << 4);
             Hours += time_buffer[1];
             masterXfer_I2C_write->data = &Hours;
@@ -656,8 +668,8 @@ void TerminalMenus_EstablishRTCHour(void* args) {
         }
     }
 }
-
-void TerminalMenus_EstablishRTCDate(void* args) {
+void TerminalMenus_EstablishRTCDate(void* args)
+{
 
     uart_struct* UART_struct = (uart_struct*) args;
     uint8_t firstEntryToMenu = pdFALSE;
@@ -709,7 +721,8 @@ void TerminalMenus_EstablishRTCDate(void* args) {
     }
 }
 
-void TerminalMenus_EstablishRTCHourFormat(void* args) {
+void TerminalMenus_EstablishRTCHourFormat(void* args)
+{
 
     uart_struct* UART_struct = (uart_struct*) args;
     uint8_t firstEntryToMenu = pdFALSE;
@@ -785,7 +798,8 @@ void TerminalMenus_EstablishRTCHourFormat(void* args) {
     }
 }
 
-void TerminalMenus_ReadRTCHour(void* args) {
+void TerminalMenus_ReadRTCHour(void* args)
+{
 
     TickType_t xLastWakeTime;
     const TickType_t xPeriod = pdMS_TO_TICKS(1000);
@@ -865,6 +879,38 @@ void TerminalMenus_ReadRTCHour(void* args) {
                     & MINUTESSECONDSLOW) + '0';
             printing_time_chars[8] = '\0';
 
+            uint8_t testHours = (((printing_time_chars[0] - '0') * 10))
+                    + (printing_time_chars[1] - '0');
+            if (12 < testHours
+                    && (pdTRUE == (time_buffer_variable[2]&TimeFormatMaskSet)>>7))
+            {
+                testHours -= 12;
+                uint8_t temporalBuffer = time_buffer_variable[2] & 0xC0;
+                temporalBuffer |= AMFMBitMask;
+                uint8_t temporalHoursTens = (testHours / 10);
+                uint8_t temporalHoursUnits = (testHours-(temporalHoursTens*10));
+                time_buffer_variable[2] = (temporalBuffer
+                        | (temporalHoursTens << 4)) + temporalHoursUnits;
+                masterXfer_I2C_write = pvPortMalloc(
+                        sizeof(i2c_master_transfer_t*));
+                masterXfer_I2C_write->data = &time_buffer_variable[2];
+                masterXfer_I2C_write->dataSize = 1;
+                masterXfer_I2C_write->direction = kI2C_Write;
+                masterXfer_I2C_write->flags = kI2C_TransferDefaultFlag;
+                masterXfer_I2C_write->slaveAddress = 0x50;
+                masterXfer_I2C_write->subaddress = (uint32_t) 0x04;
+                masterXfer_I2C_write->subaddressSize = 1;
+                xQueueSend(I2C_write_queue, &masterXfer_I2C_write,
+                           portMAX_DELAY);
+                xSemaphoreTake(I2C_done, portMAX_DELAY);
+                xSemaphoreGive(I2C_done);
+                vTaskDelay(pdMS_TO_TICKS(100));
+                printing_time_chars[0] = ((time_buffer_variable[2] & TensMask) >> 4)
+                                    + '0'; /**hours tens*/
+                            printing_time_chars[1] = (time_buffer_variable[2] & UnitsMask)
+                                    + '0';
+            }
+
             uart_transfer_t* toSend_UART;
             toSend_UART = pvPortMalloc(sizeof(uart_transfer_t*));
             toSend_UART->data = printing_time_chars;
@@ -906,8 +952,8 @@ void TerminalMenus_ReadRTCHour(void* args) {
         }
     }
 }
-
-void TerminalMenus_ReadRTCDate(void* args) {
+void TerminalMenus_ReadRTCDate(void* args)
+{
 
     TickType_t xLastWakeTime;
     const TickType_t xPeriod = pdMS_TO_TICKS(1000);
@@ -1002,7 +1048,8 @@ void TerminalMenus_ReadRTCDate(void* args) {
     }
 }
 
-void TerminalMenus_TerminalsCommunication(void* args) {
+void TerminalMenus_TerminalsCommunication(void* args)
+{
 
     uart_struct* UART_struct = (uart_struct*) args;
     uint8_t firstEntryToMenu = pdFALSE;
@@ -1039,7 +1086,8 @@ void TerminalMenus_TerminalsCommunication(void* args) {
     }
 }
 
-void TerminalMenus_LCDEcho(void* args) {
+void TerminalMenus_LCDEcho(void* args)
+{
 
     uart_struct* UART_struct = (uart_struct*) args;
     SPI_msg_t *charToBeMirrored;
