@@ -185,14 +185,14 @@ int main(void) {
    SYSconfig_UARTConfiguration(p_UART_0_struct);
     UART_tasks((void*) p_UART_0_struct);
 
-  SYSconfig_UARTConfiguration(p_UART_1_struct);
-  UART_tasks((void*) p_UART_1_struct);
+//  SYSconfig_UARTConfiguration(p_UART_1_struct);
+  //UART_tasks((void*) p_UART_1_struct);
 
     Interface_mutex = xSemaphoreCreateMutex();
     inicializacion_I2C();
    // xTaskCreate(print_eco_task, "ECO", configMINIMAL_STACK_SIZE, (void*)p_UART_0_struct, 2, NULL);
      xTaskCreate(TerminalMenus_MainMenu, "test menu 0", configMINIMAL_STACK_SIZE, (void*)p_UART_0_struct,4, NULL);
-     xTaskCreate(TerminalMenus_MainMenu, "test menu 1", configMINIMAL_STACK_SIZE, (void*)p_UART_1_struct,4, NULL);
+    // xTaskCreate(TerminalMenus_MainMenu, "test menu 1", configMINIMAL_STACK_SIZE, (void*)p_UART_1_struct,4, NULL);
 
     vTaskStartScheduler();
     while(1) {
