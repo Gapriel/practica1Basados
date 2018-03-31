@@ -701,14 +701,23 @@ void TerminalMenus_EstablishRTCDate(void* args)
 
         if (1 == LineMover.menuPositionLineIndex)
         {
+<<<<<<< HEAD
             uint8_t days;
             uint8_t months;
             uint8_t years;
             uint8_t index;
+=======
+            uint8_t months;
+            uint8_t days;
+            uint8_t years;
+            uint8_t index;
+            uint8_t date_buffer[6];
+>>>>>>> 13c092a4d93ad7b89ed032a1e0b21711cdce9602
             for (index = 0; index < 6; index++)
             {
                 date_buffer[index] = FIFO_pop(0) - 0x30;
             }
+<<<<<<< HEAD
             days = (date_buffer[0] << 4) + (date_buffer[1]);
             months = (date_buffer[2] << 4) + (date_buffer[3]);
             years = days + (date_buffer[5] << 6);
@@ -742,6 +751,10 @@ void TerminalMenus_EstablishRTCDate(void* args)
             xSemaphoreGive(I2C_done);
 
             vTaskDelay(pdMS_TO_TICKS(100));
+=======
+
+            years = (date_buffer[0] << 7)|(date_buffer[1] << 6);
+>>>>>>> 13c092a4d93ad7b89ed032a1e0b21711cdce9602
 
         }
 
