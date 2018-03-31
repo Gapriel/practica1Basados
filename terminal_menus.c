@@ -268,56 +268,51 @@ void CreateMenuTask(uart_struct* uart_struct, uint8_t menuToBeCreated)
             xTaskCreate(TerminalMenus_ReadMemory, "Read Memory Menu",
             configMINIMAL_STACK_SIZE + 50,
                         (void*) uart_struct, 3, NULL);
-            vTaskDelete(NULL);
+
         break;
         case WriteMemoryI2C:
             xTaskCreate(TerminalMenus_WriteMemory, "Write memory menu",
             configMINIMAL_STACK_SIZE,
                         (void*) uart_struct, 3, NULL);
-            vTaskDelete(NULL);
+
         break;
         case StablishHour:
             xTaskCreate(TerminalMenus_EstablishRTCHour, "Establish hour menu",
             configMINIMAL_STACK_SIZE,
                         (void*) uart_struct, 3, NULL);
-            vTaskDelete(NULL);
+
         break;
         case StablishDate:
             xTaskCreate(TerminalMenus_EstablishRTCDate, "Establish date menu",
             configMINIMAL_STACK_SIZE,
                         (void*) uart_struct, 3, NULL);
-            vTaskDelete(NULL);
+
         break;
         case TimeFormat:
             xTaskCreate(TerminalMenus_EstablishRTCHourFormat,
                         "Establish time format menu", configMINIMAL_STACK_SIZE,
                         (void*) uart_struct, 3, NULL);
-            vTaskDelete(NULL);
         break;
         case ReadHour:
             xTaskCreate(TerminalMenus_ReadRTCHour, "Read hour menu",
             configMINIMAL_STACK_SIZE,
                         (void*) uart_struct, 3, NULL);
-            vTaskDelete(NULL);
         break;
         case ReadDate:
             xTaskCreate(TerminalMenus_ReadRTCDate, "read date menu",
             configMINIMAL_STACK_SIZE,
                         (void*) uart_struct, 3, NULL);
-            vTaskDelete(NULL);
         break;
         case Terminal2Communication:
             xTaskCreate(TerminalMenus_TerminalsCommunication,
                         "terminals communication menu",
                         configMINIMAL_STACK_SIZE,
                         (void*) uart_struct, 3, NULL);
-            vTaskDelete(NULL);
         break;
         case LCDEcho:
             xTaskCreate(TerminalMenus_LCDEcho, "LCD echo menu",
             configMINIMAL_STACK_SIZE,
                         (void*) uart_struct, 3, NULL);
-            vTaskDelete(NULL);
         break;
         default:
         break;
@@ -416,6 +411,7 @@ void TerminalMenus_MainMenu(void* args)
 
         CreateMenuTask(UART_struct, charReceived - 0x30);
         vPortFree(received_UART);
+        vTaskDelete(NULL);
     }
 }
 
