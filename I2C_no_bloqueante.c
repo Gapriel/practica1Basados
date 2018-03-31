@@ -122,8 +122,6 @@ void I2C_transfer() {
         xEventGroupWaitBits(I2C_events, I2C_free, pdFALSE, pdTRUE,
                portMAX_DELAY);
         xSemaphoreGive(I2C_done);
-
-
     }
 
 }
