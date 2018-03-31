@@ -700,22 +700,18 @@ void TerminalMenus_EstablishRTCDate(void* args)
 
         if (1 == LineMover.menuPositionLineIndex)
         {
+            uint8_t months;
+            uint8_t days;
+            uint8_t years;
+            uint8_t index;
+            uint8_t date_buffer[6];
+            for (index = 0; index < 6; index++)
+            {
+                date_buffer[index] = FIFO_pop(0) - 0x30;
+            }
 
-            /*
-             masterXfer_I2C_write = pvPortMalloc(sizeof(i2c_master_transfer_t*));
-             masterXfer_I2C_write->data = &timeFormat;
-             masterXfer_I2C_write->dataSize = 1;
-             masterXfer_I2C_write->direction = kI2C_Write;
-             masterXfer_I2C_write->flags = kI2C_TransferDefaultFlag;
-             masterXfer_I2C_write->slaveAddress = 0x50;
-             masterXfer_I2C_write->subaddress = (uint32_t) subaddress;
-             masterXfer_I2C_write->subaddressSize = 1;
+            years = (date_buffer[0] << 7)|(date_buffer[1] << 6);
 
-             xQueueSend(I2C_write_queue, &masterXfer_I2C_write, portMAX_DELAY);
-             xSemaphoreTake(I2C_done, portMAX_DELAY);
-             xSemaphoreGive(I2C_done);
-             vTaskDelay(pdMS_TO_TICKS(100));
-             */
         }
 
     }
