@@ -18,5 +18,6 @@ void TerminalMenus_ReadRTCHour(void* args);
 void TerminalMenus_ReadRTCDate(void* args);
 void TerminalMenus_TerminalsCommunication(void* args);
 void TerminalMenus_LCDEcho(void* args);
+void SPIReadHour(void * args);
 
 #endif /* TERMINAL_MENUS_H_ */

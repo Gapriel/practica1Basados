@@ -198,9 +198,9 @@ int main(void) {
     SubTasks_Events = xEventGroupCreate();
     inicializacion_I2C();
    // xTaskCreate(print_eco_task, "ECO", configMINIMAL_STACK_SIZE, (void*)p_UART_0_struct, 2, NULL);
-     xTaskCreate(TerminalMenus_MainMenu, "test menu 0", configMINIMAL_STACK_SIZE, (void*)p_UART_0_struct,4, NULL);
-     xTaskCreate(TerminalMenus_MainMenu, "test menu 1", configMINIMAL_STACK_SIZE, (void*)p_UART_1_struct,4, NULL);
-
+    xTaskCreate(TerminalMenus_MainMenu, "test menu 0", configMINIMAL_STACK_SIZE, (void*)p_UART_0_struct,4, NULL);
+    xTaskCreate(TerminalMenus_MainMenu, "test menu 1", configMINIMAL_STACK_SIZE, (void*)p_UART_1_struct,4, NULL);
+    xTaskCreate(SPIReadHour, "SPI time print", configMINIMAL_STACK_SIZE+20, (void*)NULL,4, NULL);
     vTaskStartScheduler();
     while(1) {
 
