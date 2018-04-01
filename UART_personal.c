@@ -108,7 +108,6 @@ void uart_send_task(void* args) {
 
     uart_struct* UART_struct = (uart_struct*) args;
     vTaskDelay(pdMS_TO_TICKS(100));
-    static uart_transfer_t *receiveXfer_function;
     while (1)
     {
         /*
@@ -117,6 +116,7 @@ void uart_send_task(void* args) {
 
 
 
+        volatile uart_transfer_t *receiveXfer_function;
         xQueueReceive(*UART_struct->UART_send_Queue, &receiveXfer_function,
                       portMAX_DELAY);
         while (*receiveXfer_function->data)
@@ -131,13 +131,13 @@ void uart_receive_task(void* args) {
     uart_struct* UART_struct = (uart_struct*) args;
 
     static uint8_t g_rxBuffer[ECHO_BUFFER_LENGTH] = { 0 };
-    uart_transfer_t *sendXfer_function;
     uart_transfer_t receiveXfer;
 
 
     while (1)
     {
 
+        volatile uart_transfer_t *sendXfer_function;
         sendXfer_function = pvPortMalloc(sizeof(uart_transfer_t*));
         receiveXfer.data = g_rxBuffer;
         receiveXfer.dataSize = ECHO_BUFFER_LENGTH;

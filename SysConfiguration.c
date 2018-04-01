@@ -20,6 +20,13 @@
 #include "fsl_debug_console.h"
 #include "UART_personal.h"
 
+
+#define FREE_MEM_EVENT (1<<0)
+#define FREE_RTC_EVENT (1<< 1)
+
+
+extern EventGroupHandle_t SubTasks_Events;
+
 //////////////////**user types definitions*////////////////////////////
 typedef enum {
     PTA1 = 1, PTA2
@@ -63,6 +70,7 @@ void SystemConfiguration(void* args) {
         SYSconfig_ButtonsConfiguration(); /**buttons configuration*/
        SYSconfig_SPIConfiguration(); /**SPI module configuration (including device initialization)*/
         // SYSconfig_I2CConfiguration(); /**I2C module configuration*/
+       xEventGroupSetBits(SubTasks_Events, FREE_MEM_EVENT|FREE_RTC_EVENT);
 
         vTaskDelete(NULL);
     }

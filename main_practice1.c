@@ -56,6 +56,8 @@
 #include "terminal_menus.h"
 #define STACK_SIZE 150
 
+#define FREE_MEM_EVENT (1<<0)
+#define FREE_RTC_EVENT (1<< 1)
 
 extern QueueHandle_t I2C_write_queue;
 extern QueueHandle_t I2C_read_queue;
@@ -68,11 +70,14 @@ volatile QueueHandle_t UART0_receive_Queue;
 volatile uart_handle_t g_uart0Handle;
 volatile EventGroupHandle_t g_UART0_Events;
 
+volatile EventGroupHandle_t SubTasks_Events;
 
 volatile QueueHandle_t UART1_send_Queue;
 volatile QueueHandle_t UART1_receive_Queue;
 volatile uart_handle_t g_uart1Handle;
 volatile EventGroupHandle_t g_UART1_Events;
+
+
 
 
 static uart_struct UART_0_struct = {
@@ -190,6 +195,7 @@ int main(void) {
    UART_tasks((void*) p_UART_1_struct);
 
     Interface_mutex = xSemaphoreCreateMutex();
+    SubTasks_Events = xEventGroupCreate();
     inicializacion_I2C();
    // xTaskCreate(print_eco_task, "ECO", configMINIMAL_STACK_SIZE, (void*)p_UART_0_struct, 2, NULL);
      xTaskCreate(TerminalMenus_MainMenu, "test menu 0", configMINIMAL_STACK_SIZE, (void*)p_UART_0_struct,4, NULL);
