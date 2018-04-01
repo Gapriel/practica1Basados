@@ -825,20 +825,27 @@ void TerminalMenus_EstablishRTCHourFormat(void* args)
 
             } else
             {
-                // 0 es para formato de 24 horas
-                              if(pdFALSE == (readBuffer << 7)){ //Si ya estaba en formato de 24 horas
-                                  timeFormat = readBuffer ;//| TimeFormatMaskSet;
+               // 0 es para formato de 24 horas
+                if(pdFALSE == (readBuffer >> 7)){ //Si ya estaba en formato de 24 horas
+                    timeFormat = readBuffer ;//| TimeFormatMaskSet;
 
-                              }else{
-                                       hours_provitional = ((readBuffer & 0x3F) >> 4)*10 + ((readBuffer & 0xF));
-                                       if(hours_provitional == 12){
-                                           readBuffer = hours_provitional;
-                                       }else{
-                                           readBuffer = hours_provitional + 12*((readBuffer << 6) & 0x1);
-                                       }
+                }else{
+                    hours_provitional = ((readBuffer & 0x3F) >> 4)*10 + ((readBuffer & 0xF));
+                    if(hours_provitional == 12){
+                        readBuffer = readBuffer;
+                    }else{
+                        hours_provitional = hours_provitional + 12*(((readBuffer >> 6)) & 0x1);
+                        uint8_t dec_hours = hours_provitional/10;
+                        uint8_t u_hours = hours_provitional - dec_hours*10;
+
+                        readBuffer =  ((dec_hours << 4) + u_hours);
+                    }
                 timeFormat = readBuffer & TimeFormatMaskNegate;
-            }
+                }
 
+        }
+
+            vTaskDelay(pdMS_TO_TICKS(100));
             masterXfer_I2C_write = pvPortMalloc(sizeof(i2c_master_transfer_t*));
             masterXfer_I2C_write->data = &timeFormat;
             masterXfer_I2C_write->dataSize = 1;
@@ -853,7 +860,6 @@ void TerminalMenus_EstablishRTCHourFormat(void* args)
             xSemaphoreGive(I2C_done);
             vTaskDelay(pdMS_TO_TICKS(100));
 
-        }
         }
 
     }
@@ -889,8 +895,7 @@ void TerminalMenus_ReadRTCHour(void* args)
             xSemaphoreGive(Interface_mutex);
         }
 
-        if (pdPASS
-                == xQueueReceive(*UART_struct->UART_receive_Queue,
+        if (pdPASS == xQueueReceive(*UART_struct->UART_receive_Queue,
                                  &received_UART, 0))
         {
 

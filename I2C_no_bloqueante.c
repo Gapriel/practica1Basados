@@ -107,7 +107,7 @@ void I2CInit() {
 
 void I2C_transfer() {
 
-    i2c_master_transfer_t *masterXfer;
+    static i2c_master_transfer_t *masterXfer;
     uint8_t valor_a_enviar[1];
 
 //I2C_0 data block transmission
@@ -122,6 +122,8 @@ void I2C_transfer() {
         I2C_MasterTransferNonBlocking(I2C1, &g_m_handle, masterXfer);
         xEventGroupWaitBits(I2C_events, I2C_free, pdFALSE, pdTRUE,
                portMAX_DELAY);
+
+        vTaskDelay(pdMS_TO_TICKS(100));
         xSemaphoreGive(I2C_done);
         vPortFree(masterXfer);
     }
