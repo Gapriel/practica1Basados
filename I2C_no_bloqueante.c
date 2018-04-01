@@ -55,6 +55,9 @@ volatile QueueHandle_t I2C_write_queue;
 volatile EventGroupHandle_t I2C_events;
 volatile SemaphoreHandle_t I2C_done;
 
+TaskHandle_t I2C_Transfer;
+
+TimerHandle_t I2C_Timmer_Handler;
 
 #define I2C_free (1<< 0)
 #define I2C_data_ready (1 << 1)
@@ -65,16 +68,17 @@ static void i2c_master_callback(I2C_Type *base, i2c_master_handle_t *handle,
     pxHigherPriorityTaskWoken = pdFALSE;
     if (status == kStatus_Success)
     {
-
             xEventGroupSetBitsFromISR(I2C_events, I2C_free,
                                       &pxHigherPriorityTaskWoken);
-
     }
 
     portYIELD_FROM_ISR(pxHigherPriorityTaskWoken);
 }
 
 
+EventGroupHandle_t* pGetI2CEvents(){
+    return &I2C_events;
+}
 
 QueueHandle_t* pGetI2CHandler(){
     return &I2C_write_queue;
@@ -123,15 +127,17 @@ void I2C_transfer() {
     {
 
         xQueueReceive(I2C_write_queue, &masterXfer, portMAX_DELAY);
-
         xSemaphoreTake(I2C_done,portMAX_DELAY);
         xEventGroupWaitBits(I2C_events, I2C_free, pdTRUE, pdTRUE,
         portMAX_DELAY);
+
+        xTimerStart(I2C_Timmer_Handler,0);
         I2C_MasterTransferNonBlocking(I2C1, &g_m_handle, masterXfer);
         xEventGroupWaitBits(I2C_events, I2C_free, pdFALSE, pdTRUE,
                portMAX_DELAY);
 
         xSemaphoreGive(I2C_done);
+        xTimerStop(I2C_Timmer_Handler,0);
         vPortFree(masterXfer);
     }
 
@@ -145,7 +151,8 @@ void inicializacion_I2C(void) {
     I2C_write_queue = xQueueCreate(1, sizeof(i2c_master_transfer_t*));
     xTaskCreate(I2CInit, "Init I2C", configMINIMAL_STACK_SIZE , NULL, 5,
     NULL);
-    xTaskCreate(I2C_transfer, "transfer", configMINIMAL_STACK_SIZE, NULL,
-                        5, NULL);
+    I2C_Timmer_Handler = xTimerCreate("I2C Timer", pdMS_TO_TICKS(500), pdFALSE, NULL, I2C_restart);
+    xTaskCreate(I2C_transfer, "I2C Transfer", configMINIMAL_STACK_SIZE, NULL,
+                        5, I2C_Transfer);
 
 }

@@ -27,7 +27,6 @@
 
 
 volatile EventGroupHandle_t* pSubTasks_Events;
-
 SemaphoreHandle_t* pInterface_mutex;
 
 //////////////////**user types definitions*////////////////////////////
@@ -76,6 +75,7 @@ void SystemConfiguration(void* args) {
         *pInterface_mutex = xSemaphoreCreateMutex();
         SYSconfig_ButtonsConfiguration(); /**buttons configuration*/
         SYSconfig_SPIConfiguration(); /**SPI module configuration (including device initialization)*/
+        inicializacion_I2C();
         // SYSconfig_I2CConfiguration(); /**I2C module configuration*/
        xEventGroupSetBits(*pSubTasks_Events, FREE_MEM_EVENT|FREE_RTC_EVENT);
 
@@ -115,6 +115,8 @@ void SYSconfig_SPIConfiguration() {
 
 
 void SYSconfig_I2CConfiguration() {
+
+    inicializacion_I2C();
 }
 
 ////////////**I2C Bug fixing functions provided by NXP*/////////////

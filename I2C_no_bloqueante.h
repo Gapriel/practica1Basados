@@ -56,7 +56,12 @@
 #include "queue.h"
 #include "event_groups.h"
 #include "FreeRTOSConfig.h"
+#include "timers.h"
 
+void I2C_restart(TimerHandle_t handler);
+
+
+EventGroupHandle_t* pGetI2CEvents();
 
 SemaphoreHandle_t* pGetI2Mutex();
 void I2CInit();

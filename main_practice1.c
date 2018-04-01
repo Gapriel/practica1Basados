@@ -80,7 +80,7 @@ chatStates_t TerminalChatStates = {
     {pdFALSE,pdFALSE}
 };
 
-static uart_struct UART_0_struct = {
+uart_struct UART_0_struct = {
         UART0,
         &g_uart0Handle,
         &g_UART0_Events,
@@ -91,7 +91,7 @@ static uart_struct UART_0_struct = {
 };
 
 
-static uart_struct UART_1_struct = {
+uart_struct UART_1_struct = {
         UART1,
         &g_uart1Handle,
         &g_UART1_Events,
@@ -195,9 +195,8 @@ int main(void) {
 
     SYSconfig_UARTConfiguration(p_UART_1_struct);
     UART_tasks((void*) p_UART_1_struct);
-    inicializacion_I2C();
-    xTaskCreate(TerminalMenus_MainMenu, "test menu 0", configMINIMAL_STACK_SIZE, (void*)p_UART_0_struct,4, NULL);
-    xTaskCreate(TerminalMenus_MainMenu, "test menu 1", configMINIMAL_STACK_SIZE, (void*)p_UART_1_struct,4, NULL);
+    xTaskCreate(TerminalMenus_MainMenu, "test menu 0", configMINIMAL_STACK_SIZE - 30, (void*)p_UART_0_struct,4, NULL);
+  //  xTaskCreate(TerminalMenus_MainMenu, "test menu 1", configMINIMAL_STACK_SIZE, (void*)p_UART_1_struct,4, NULL);
 //    xTaskCreate(SPIReadHour, "SPI time print", configMINIMAL_STACK_SIZE+20, (void*)NULL,4, NULL);
     vTaskStartScheduler();
     while(1) {
