@@ -412,6 +412,28 @@ void CheckIfLineMovementAndUartEcho(uart_struct* UART_struct,
     }
 }
 
+uint16_t ASCII_TO_uint8_t(uint8_t fifo_number, uint8_t fifo_pops)
+{
+    uint8_t ascii_address_index;
+    uint16_t address = 0;
+    uint8_t fifo_value;
+    for (ascii_address_index = 0; ascii_address_index < fifo_pops;
+            ascii_address_index++)
+    {
+        fifo_value = FIFO_pop(fifo_number);
+        if (('0' <= fifo_value) && (fifo_value <= '9'))
+        {
+            fifo_value -= '0';
+        } else if (('A' <= fifo_value) && (fifo_value <= 'F'))
+        {
+            fifo_value -= ('A' - 10);
+        }
+        address += (fifo_value << (4 * (fifo_pops - ascii_address_index - 1)));
+    }
+    FIFO_pop(fifo_number);
+    return address;
+}
+
 //////////////////////////////////////////MENUS FUNCTIONS BODIES////////////////////////////////////////////
 void TerminalMenus_MainMenu(void* args)
 {
@@ -436,28 +458,6 @@ void TerminalMenus_MainMenu(void* args)
         vPortFree(received_UART);
         vTaskDelete(NULL);
     }
-}
-
-uint16_t ASCII_TO_uint8_t(uint8_t fifo_number, uint8_t fifo_pops)
-{
-    uint8_t ascii_address_index;
-    uint16_t address = 0;
-    uint8_t fifo_value;
-    for (ascii_address_index = 0; ascii_address_index < fifo_pops;
-            ascii_address_index++)
-    {
-        fifo_value = FIFO_pop(fifo_number);
-        if (('0' <= fifo_value) && (fifo_value <= '9'))
-        {
-            fifo_value -= '0';
-        } else if (('A' <= fifo_value) && (fifo_value <= 'F'))
-        {
-            fifo_value -= ('A' - 10);
-        }
-        address += (fifo_value << (4 * (fifo_pops - ascii_address_index - 1)));
-    }
-    FIFO_pop(fifo_number);
-    return address;
 }
 
 void TerminalMenus_ReadMemory(void* args)
@@ -1137,13 +1137,15 @@ void TerminalMenus_ReadRTCDate(void* args)
 
 void TerminalMenus_TerminalsCommunication(void* args)
 {
-    xEventGroupWaitBits(SubTasks_Events, FREE_RTC_EVENT, pdTRUE, pdTRUE,
-    portMAX_DELAY);
+    //xEventGroupWaitBits(SubTasks_Events, FREE_RTC_EVENT, pdTRUE, pdTRUE,
+    //portMAX_DELAY);
 
     uart_struct* UART_struct = (uart_struct*) args;
     uint8_t firstEntryToMenu = pdFALSE;
     uart_transfer_t* received_UART;
+    uint8_t connection_array[22] = { "Terminal x se conecto" };
     uint8_t charReceived = 0;
+    uart_transfer_t* toSend_UART;
     LineMovementPack_t LineMover = { 0, 0, 1,
     pdFALSE, { pdFALSE, pdTRUE, pdTRUE }, { { { "\033[12;10H" } } }, //struct with constant position reference used in memory read menu
         { 10000, 0 } };
@@ -1154,9 +1156,53 @@ void TerminalMenus_TerminalsCommunication(void* args)
         {
             xSemaphoreTake(Interface_mutex, portMAX_DELAY);
             firstEntryToMenu = pdTRUE;
+            UART_struct->ChatStates->terminalChatStates[UART_struct->uart_number] =
+                        pdTRUE;
+
             MenuPrinter(UART_struct, Terminal2Communication); //TODO: identify which terminal is inside the function
+
+            toSend_UART = pvPortMalloc(sizeof(uart_transfer_t*));
+            toSend_UART->data = UART_struct->ChatStates->chatPosition;
+            xQueueSend(*UART_struct->UART_send_Queue, &toSend_UART,
+                       portMAX_DELAY);
+            vTaskDelay(pdMS_TO_TICKS(20)); /**gives time for the UART to properly print the string sent*/
+
+            connection_array[9] = (UART_0 == UART_struct->uart_number) ? '1' : '2';
             xSemaphoreGive(Interface_mutex);
         }
+
+        if(pdFALSE == UART_struct->ChatStates->FirstEntry[UART_struct->uart_number]){
+            UART_struct->ChatStates->FirstEntry[UART_struct->uart_number] = pdTRUE;         //TODO: after exiting, this variable should be reset
+            if((UART_0 == UART_struct->uart_number) && pdTRUE == (UART_struct->ChatStates->terminalChatStates[UART_1])){
+                toSend_UART = pvPortMalloc(sizeof(uart_transfer_t*));
+                toSend_UART->data = connection_array;
+                xQueueSend(*UART_struct->ChatStates->UART1_send_Queue,
+                           &toSend_UART, portMAX_DELAY);
+                vTaskDelay(pdMS_TO_TICKS(20)); /**gives time for the UART to properly print the string sent*/
+
+            }else if((UART_1 == UART_struct->uart_number) && pdTRUE == (UART_struct->ChatStates->terminalChatStates[UART_0])){
+                toSend_UART = pvPortMalloc(sizeof(uart_transfer_t*));
+                toSend_UART->data = connection_array;
+                xQueueSend(*UART_struct->ChatStates->UART0_send_Queue,
+                           &toSend_UART, portMAX_DELAY);
+                vTaskDelay(pdMS_TO_TICKS(20)); /**gives time for the UART to properly print the string sent*/
+
+            }
+            if(pdTRUE == (UART_struct->ChatStates->terminalChatStates[UART_0]) && pdTRUE == (UART_struct->ChatStates->terminalChatStates[UART_1])){
+                UART_struct->ChatStates->chatPosition[3] = '5';
+                toSend_UART = pvPortMalloc(sizeof(uart_transfer_t*));
+                toSend_UART->data = UART_struct->ChatStates->chatPosition;
+                xQueueSend(*UART_struct->ChatStates->UART0_send_Queue,
+                           &toSend_UART, portMAX_DELAY);
+                vTaskDelay(pdMS_TO_TICKS(20)); /**gives time for the UART to properly print the string sent*/
+                toSend_UART = pvPortMalloc(sizeof(uart_transfer_t*));
+                toSend_UART->data = UART_struct->ChatStates->chatPosition;
+                xQueueSend(*UART_struct->ChatStates->UART1_send_Queue,
+                           &toSend_UART, portMAX_DELAY);
+                vTaskDelay(pdMS_TO_TICKS(20)); /**gives time for the UART to properly print the string sent*/
+            }
+        }
+
         xQueueReceive(*UART_struct->UART_receive_Queue, &received_UART,
                       portMAX_DELAY);
         charReceived = *received_UART->data;
@@ -1167,7 +1213,7 @@ void TerminalMenus_TerminalsCommunication(void* args)
 
             CharacterValidator(&LineMover, Terminal2Communication,
                                charReceived);
-            CheckIfReturnToMenu(UART_struct, charReceived, RTC_TASK);
+            CheckIfReturnToMenu(UART_struct, charReceived, 2);
             CheckIfLineMovementAndUartEcho(UART_struct, charReceived,
                                            &LineMover);
         }
@@ -1241,7 +1287,7 @@ void SPIReadHour(void * args)
     vTaskDelay(pdMS_TO_TICKS(1000));
     for (;;)
     {
-       // xLastWakeTime = xTaskGetTickCount();
+        xLastWakeTime = xTaskGetTickCount();
 
         uint16_t subaddress = 0x02;
         for (index = 0; index < 3; index++)
@@ -1345,8 +1391,7 @@ void SPIReadHour(void * args)
         xQueueSend(SPI_queue, &timeString, portMAX_DELAY);
         vTaskDelay(pdMS_TO_TICKS(100));
 
-        vTaskDelay(pdMS_TO_TICKS(1000));
-       // vTaskDelayUntil(&xLastWakeTime, xPeriod);
+        vTaskDelayUntil(&xLastWakeTime, xPeriod);
     }
 }
 

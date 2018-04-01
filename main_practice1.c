@@ -77,8 +77,13 @@ volatile QueueHandle_t UART1_receive_Queue;
 volatile uart_handle_t g_uart1Handle;
 volatile EventGroupHandle_t g_UART1_Events;
 
-
-
+chatStates_t TerminalChatStates = {
+    {pdFALSE,pdFALSE},
+    {"\033[12;10H"},
+    &UART0_send_Queue,
+    &UART1_send_Queue,
+    {pdFALSE,pdFALSE}
+};
 
 static uart_struct UART_0_struct = {
         UART0,
@@ -86,7 +91,8 @@ static uart_struct UART_0_struct = {
         &g_UART0_Events,
         &UART0_receive_Queue,
         &UART0_send_Queue,
-        UART_0
+        UART_0,
+        &TerminalChatStates
 };
 
 
@@ -96,7 +102,8 @@ static uart_struct UART_1_struct = {
         &g_UART1_Events,
         &UART1_receive_Queue,
         &UART1_send_Queue,
-        UART_1
+        UART_1,
+        &TerminalChatStates
 };
 
 #if 1
@@ -200,7 +207,7 @@ int main(void) {
    // xTaskCreate(print_eco_task, "ECO", configMINIMAL_STACK_SIZE, (void*)p_UART_0_struct, 2, NULL);
     xTaskCreate(TerminalMenus_MainMenu, "test menu 0", configMINIMAL_STACK_SIZE, (void*)p_UART_0_struct,4, NULL);
     xTaskCreate(TerminalMenus_MainMenu, "test menu 1", configMINIMAL_STACK_SIZE, (void*)p_UART_1_struct,4, NULL);
-    xTaskCreate(SPIReadHour, "SPI time print", configMINIMAL_STACK_SIZE+20, (void*)NULL,4, NULL);
+    //xTaskCreate(SPIReadHour, "SPI time print", configMINIMAL_STACK_SIZE+20, (void*)NULL,4, NULL);
     vTaskStartScheduler();
     while(1) {
 
