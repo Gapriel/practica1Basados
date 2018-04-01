@@ -59,23 +59,18 @@
 #define FREE_MEM_EVENT (1<<0)
 #define FREE_RTC_EVENT (1<< 1)
 
-extern QueueHandle_t I2C_write_queue;
-extern QueueHandle_t I2C_read_queue;
-extern QueueHandle_t SPI_queue;
-extern SemaphoreHandle_t I2C_done;
 
-SemaphoreHandle_t Interface_mutex;
-volatile QueueHandle_t UART0_send_Queue;
-volatile QueueHandle_t UART0_receive_Queue;
-volatile uart_handle_t g_uart0Handle;
-volatile EventGroupHandle_t g_UART0_Events;
 
-volatile EventGroupHandle_t SubTasks_Events;
 
-volatile QueueHandle_t UART1_send_Queue;
-volatile QueueHandle_t UART1_receive_Queue;
-volatile uart_handle_t g_uart1Handle;
-volatile EventGroupHandle_t g_UART1_Events;
+QueueHandle_t UART0_send_Queue;
+QueueHandle_t UART0_receive_Queue;
+uart_handle_t g_uart0Handle;
+EventGroupHandle_t g_UART0_Events;
+
+QueueHandle_t UART1_send_Queue;
+QueueHandle_t UART1_receive_Queue;
+uart_handle_t g_uart1Handle;
+EventGroupHandle_t g_UART1_Events;
 
 chatStates_t TerminalChatStates = {
     {pdFALSE,pdFALSE},
@@ -106,7 +101,7 @@ static uart_struct UART_1_struct = {
         &TerminalChatStates
 };
 
-#if 1
+#if 0
 void print_eco_task(void* args){
     SPI_msg_t *message;
     uart_struct* UART_struct = (uart_struct*) args;
@@ -195,19 +190,15 @@ int main(void) {
 
     xTaskCreate(SystemConfiguration, "CONFIG",configMINIMAL_STACK_SIZE,NULL,5,NULL);
 
-   SYSconfig_UARTConfiguration(p_UART_0_struct);
+    SYSconfig_UARTConfiguration(p_UART_0_struct);
     UART_tasks((void*) p_UART_0_struct);
 
-   SYSconfig_UARTConfiguration(p_UART_1_struct);
-   UART_tasks((void*) p_UART_1_struct);
-
-    Interface_mutex = xSemaphoreCreateMutex();
-    SubTasks_Events = xEventGroupCreate();
+    SYSconfig_UARTConfiguration(p_UART_1_struct);
+    UART_tasks((void*) p_UART_1_struct);
     inicializacion_I2C();
-   // xTaskCreate(print_eco_task, "ECO", configMINIMAL_STACK_SIZE, (void*)p_UART_0_struct, 2, NULL);
     xTaskCreate(TerminalMenus_MainMenu, "test menu 0", configMINIMAL_STACK_SIZE, (void*)p_UART_0_struct,4, NULL);
     xTaskCreate(TerminalMenus_MainMenu, "test menu 1", configMINIMAL_STACK_SIZE, (void*)p_UART_1_struct,4, NULL);
-    //xTaskCreate(SPIReadHour, "SPI time print", configMINIMAL_STACK_SIZE+20, (void*)NULL,4, NULL);
+//    xTaskCreate(SPIReadHour, "SPI time print", configMINIMAL_STACK_SIZE+20, (void*)NULL,4, NULL);
     vTaskStartScheduler();
     while(1) {
 

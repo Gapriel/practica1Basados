@@ -19,13 +19,16 @@
 #include "NVIC.h"
 #include "fsl_debug_console.h"
 #include "UART_personal.h"
-
+#include "terminal_menus.h"
+#include "event_groups.h"
 
 #define FREE_MEM_EVENT (1<<0)
 #define FREE_RTC_EVENT (1<< 1)
 
 
-extern EventGroupHandle_t SubTasks_Events;
+volatile EventGroupHandle_t* pSubTasks_Events;
+
+SemaphoreHandle_t* pInterface_mutex;
 
 //////////////////**user types definitions*////////////////////////////
 typedef enum {
@@ -67,12 +70,16 @@ void SystemConfiguration(void* args) {
         CLOCK_EnableClock(kCLOCK_PortB);
         CLOCK_EnableClock(kCLOCK_PortC);
         /**modules configuration*/
+        pInterface_mutex = (SemaphoreHandle_t*) pGetInterfaceMutex();
+        pSubTasks_Events = (EventGroupHandle_t*) pGetSubTasksEvents();
+        *pSubTasks_Events = xEventGroupCreate();
+        *pInterface_mutex = xSemaphoreCreateMutex();
         SYSconfig_ButtonsConfiguration(); /**buttons configuration*/
-       SYSconfig_SPIConfiguration(); /**SPI module configuration (including device initialization)*/
+        SYSconfig_SPIConfiguration(); /**SPI module configuration (including device initialization)*/
         // SYSconfig_I2CConfiguration(); /**I2C module configuration*/
-       xEventGroupSetBits(SubTasks_Events, FREE_MEM_EVENT|FREE_RTC_EVENT);
+       xEventGroupSetBits(*pSubTasks_Events, FREE_MEM_EVENT|FREE_RTC_EVENT);
 
-        vTaskDelete(NULL);
+       vTaskDelete(NULL);
     }
 }
 

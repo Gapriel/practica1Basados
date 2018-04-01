@@ -26,6 +26,7 @@ dspi_master_handle_t g_m_handle_I2C;
 dspi_transfer_t masterXfer_SPI;
 SemaphoreHandle_t g_SPI_mutex;
 EventGroupHandle_t g_SPI_events;
+
 QueueHandle_t SPI_queue;
 
 //////////////////**user types definitions*////////////////////////////
@@ -39,6 +40,9 @@ typedef enum {
 
 
 
+QueueHandle_t* pGetSPIHandler(){
+    return &SPI_queue;
+}
 void task_SPI_print();
 /////////////////////**module callbacks*///////////////////////////////
 void DSPI_MasterUserCallback(SPI_Type *base, dspi_master_handle_t *handle,

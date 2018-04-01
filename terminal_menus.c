@@ -43,18 +43,24 @@
 #define FREE_MEM_EVENT (1<<0)
 #define FREE_RTC_EVENT (1<< 1)
 
+#define STRING_SIZE 77
+
 typedef enum {
     MEMORY_TASK, RTC_TASK, SPI_TASK
 } task_type;
 
-extern QueueHandle_t SPI_queue;
-extern QueueHandle_t I2C_read_queue;
-extern QueueHandle_t I2C_write_queue;
-extern SemaphoreHandle_t I2C_done;
-extern SemaphoreHandle_t Interface_mutex;
-extern EventGroupHandle_t SubTasks_Events;
 
-#define STRING_SIZE 77
+
+QueueHandle_t* pSPI_queue;
+
+SemaphoreHandle_t Interface_mutex;
+
+
+QueueHandle_t* pI2C_write_queue;
+SemaphoreHandle_t* pI2C_done;
+
+EventGroupHandle_t SubTasks_Events;
+
 typedef struct {
     struct {
         uint8_t terminal_position[9];
@@ -71,6 +77,14 @@ typedef struct {
     uint16_t charactersPerInputSpace[INPUT_SPACES];
     uint8_t validCharacter;
 } LineMovementPack_t;
+
+EventGroupHandle_t* pGetSubTasksEvents(){
+    return &SubTasks_Events;
+}
+
+SemaphoreHandle_t* pGetInterfaceMutex(){
+    return &Interface_mutex;
+}
 
 void PORTA_IRQHandler()
 {
@@ -437,10 +451,15 @@ uint16_t ASCII_TO_uint8_t(uint8_t fifo_number, uint8_t fifo_pops)
 //////////////////////////////////////////MENUS FUNCTIONS BODIES////////////////////////////////////////////
 void TerminalMenus_MainMenu(void* args)
 {
+    pI2C_write_queue = pGetI2CHandler();
+    pSPI_queue = pGetSPIHandler();
+    pI2C_done = pGetI2Mutex();
+
     uart_struct* UART_struct = (uart_struct*) args;
     uint8_t firstEntryToMenu = pdFALSE;
     uart_transfer_t* received_UART;
     uint8_t charReceived = 0;
+    vTaskDelay(pdMS_TO_TICKS(500));
     for (;;)
     {
         if (pdFALSE == firstEntryToMenu)
@@ -507,9 +526,9 @@ void TerminalMenus_ReadMemory(void* args)
             masterXfer_I2C_read->subaddressSize = 2;
             read_buffer[BytesToRead] = '\0';
 
-            xQueueSend(I2C_write_queue, &masterXfer_I2C_read, portMAX_DELAY);
-            xSemaphoreTake(I2C_done, portMAX_DELAY);
-            xSemaphoreGive(I2C_done);
+            xQueueSend(*pI2C_write_queue, &masterXfer_I2C_read, portMAX_DELAY);
+            xSemaphoreTake(*pI2C_done, portMAX_DELAY);
+            xSemaphoreGive(*pI2C_done);
             vTaskDelay(pdMS_TO_TICKS(100));
             uart_transfer_t* toSend_UART;
             toSend_UART = pvPortMalloc(sizeof(uart_transfer_t*));
@@ -565,10 +584,10 @@ void TerminalMenus_WriteMemory(void* args)
             masterXfer_I2C_write->slaveAddress = 0x51;
             masterXfer_I2C_write->subaddress = (uint32_t) subaddress;
             masterXfer_I2C_write->subaddressSize = 2;
-            xSemaphoreGive(I2C_done);
-            xQueueSend(I2C_write_queue, &masterXfer_I2C_write, portMAX_DELAY);
-            xSemaphoreTake(I2C_done, portMAX_DELAY);
-            xSemaphoreGive(I2C_done);
+            xSemaphoreGive(*pI2C_done);
+            xQueueSend(*pI2C_write_queue, &masterXfer_I2C_write, portMAX_DELAY);
+            xSemaphoreTake(*pI2C_done, portMAX_DELAY);
+            xSemaphoreGive(*pI2C_done);
             vTaskDelay(pdMS_TO_TICKS(50));
 
         }
@@ -634,9 +653,9 @@ void TerminalMenus_EstablishRTCHour(void* args)
             masterXfer_I2C_write->subaddress = (uint32_t) subaddress;
             masterXfer_I2C_write->subaddressSize = 1;
 
-            xQueueSend(I2C_write_queue, &masterXfer_I2C_write, portMAX_DELAY);
-            xSemaphoreTake(I2C_done, portMAX_DELAY);
-            xSemaphoreGive(I2C_done);
+            xQueueSend(*pI2C_write_queue, &masterXfer_I2C_write, portMAX_DELAY);
+            xSemaphoreTake(*pI2C_done, portMAX_DELAY);
+            xSemaphoreGive(*pI2C_done);
 
             vTaskDelay(pdMS_TO_TICKS(50));
             masterXfer_I2C_write = pvPortMalloc(sizeof(i2c_master_transfer_t*));
@@ -650,9 +669,9 @@ void TerminalMenus_EstablishRTCHour(void* args)
             masterXfer_I2C_write->subaddressSize = 1;
 
             vTaskDelay(pdMS_TO_TICKS(50));
-            xQueueSend(I2C_write_queue, &masterXfer_I2C_write, portMAX_DELAY);
-            xSemaphoreTake(I2C_done, portMAX_DELAY);
-            xSemaphoreGive(I2C_done);
+            xQueueSend(*pI2C_write_queue, &masterXfer_I2C_write, portMAX_DELAY);
+            xSemaphoreTake(*pI2C_done, portMAX_DELAY);
+            xSemaphoreGive(*pI2C_done);
 
             vTaskDelay(pdMS_TO_TICKS(50));
             masterXfer_I2C_write = pvPortMalloc(sizeof(i2c_master_transfer_t*));
@@ -667,9 +686,9 @@ void TerminalMenus_EstablishRTCHour(void* args)
             masterXfer_I2C_write->slaveAddress = 0x50;
             masterXfer_I2C_write->subaddress = (uint32_t) subaddress;
             masterXfer_I2C_write->subaddressSize = 1;
-            xQueueSend(I2C_write_queue, &masterXfer_I2C_write, portMAX_DELAY);
-            xSemaphoreTake(I2C_done, portMAX_DELAY);
-            xSemaphoreGive(I2C_done);
+            xQueueSend(*pI2C_write_queue, &masterXfer_I2C_write, portMAX_DELAY);
+            xSemaphoreTake(*pI2C_done, portMAX_DELAY);
+            xSemaphoreGive(*pI2C_done);
 
             readBuffer = readBuffer & 0xC0;
             masterXfer_I2C_write = pvPortMalloc(sizeof(i2c_master_transfer_t*));
@@ -683,9 +702,9 @@ void TerminalMenus_EstablishRTCHour(void* args)
             masterXfer_I2C_write->subaddress = (uint32_t) subaddress;
             masterXfer_I2C_write->subaddressSize = 1;
 
-            xQueueSend(I2C_write_queue, &masterXfer_I2C_write, portMAX_DELAY);
-            xSemaphoreTake(I2C_done, portMAX_DELAY);
-            xSemaphoreGive(I2C_done);
+            xQueueSend(*pI2C_write_queue, &masterXfer_I2C_write, portMAX_DELAY);
+            xSemaphoreTake(*pI2C_done, portMAX_DELAY);
+            xSemaphoreGive(*pI2C_done);
             vTaskDelay(pdMS_TO_TICKS(50));
 
         }
@@ -747,9 +766,9 @@ void TerminalMenus_EstablishRTCDate(void* args)
             masterXfer_I2C_write->slaveAddress = 0x50;
             masterXfer_I2C_write->subaddress = (uint32_t) subaddress;
             masterXfer_I2C_write->subaddressSize = 1;
-            xQueueSend(I2C_write_queue, &masterXfer_I2C_write, portMAX_DELAY);
-            xSemaphoreTake(I2C_done, portMAX_DELAY);
-            xSemaphoreGive(I2C_done);
+            xQueueSend(*pI2C_write_queue, &masterXfer_I2C_write, portMAX_DELAY);
+            xSemaphoreTake(*pI2C_done, portMAX_DELAY);
+            xSemaphoreGive(*pI2C_done);
             vTaskDelay(pdMS_TO_TICKS(50));
 
             subaddress = 0x06;
@@ -761,9 +780,9 @@ void TerminalMenus_EstablishRTCDate(void* args)
             masterXfer_I2C_write->slaveAddress = 0x50;
             masterXfer_I2C_write->subaddress = (uint32_t) subaddress;
             masterXfer_I2C_write->subaddressSize = 1;
-            xQueueSend(I2C_write_queue, &masterXfer_I2C_write, portMAX_DELAY);
-            xSemaphoreTake(I2C_done, portMAX_DELAY);
-            xSemaphoreGive(I2C_done);
+            xQueueSend(*pI2C_write_queue, &masterXfer_I2C_write, portMAX_DELAY);
+            xSemaphoreTake(*pI2C_done, portMAX_DELAY);
+            xSemaphoreGive(*pI2C_done);
 
             vTaskDelay(pdMS_TO_TICKS(100));
 
@@ -818,13 +837,12 @@ void TerminalMenus_EstablishRTCHourFormat(void* args)
             masterXfer_I2C_write->slaveAddress = 0x50;
             masterXfer_I2C_write->subaddress = (uint32_t) subaddress;
             masterXfer_I2C_write->subaddressSize = 1;
-            xQueueSend(I2C_write_queue, &masterXfer_I2C_write, portMAX_DELAY);
-            xSemaphoreTake(I2C_done, portMAX_DELAY);
-            xSemaphoreGive(I2C_done);
+            xQueueSend(*pI2C_write_queue, &masterXfer_I2C_write, portMAX_DELAY);
+            xSemaphoreTake(*pI2C_done, portMAX_DELAY);
+            xSemaphoreGive(*pI2C_done);
 
             vTaskDelay(pdMS_TO_TICKS(20));
             uint8_t hours_provitional;
-            uint8_t hours_final;
             uint8_t character = FIFO_pop(0);
             if ('1' == character)
             {
@@ -868,9 +886,9 @@ void TerminalMenus_EstablishRTCHourFormat(void* args)
             masterXfer_I2C_write->subaddress = (uint32_t) subaddress;
             masterXfer_I2C_write->subaddressSize = 1;
 
-            xQueueSend(I2C_write_queue, &masterXfer_I2C_write, portMAX_DELAY);
-            xSemaphoreTake(I2C_done, portMAX_DELAY);
-            xSemaphoreGive(I2C_done);
+            xQueueSend(*pI2C_write_queue, &masterXfer_I2C_write, portMAX_DELAY);
+            xSemaphoreTake(*pI2C_done, portMAX_DELAY);
+            xSemaphoreGive(*pI2C_done);
             vTaskDelay(pdMS_TO_TICKS(100));
 
         }
@@ -887,7 +905,6 @@ void TerminalMenus_ReadRTCHour(void* args)
     const TickType_t xPeriod = pdMS_TO_TICKS(1000);
     uart_struct* UART_struct = (uart_struct*) args;
     uint8_t firstEntryToMenu = pdFALSE;
-    uart_transfer_t dummy_uart = { 0, 1 };
     uint8_t charReceived = 0;
     uint8_t time_buffer_variable[3];
     uint8_t printing_time_chars[9];
@@ -938,10 +955,10 @@ void TerminalMenus_ReadRTCHour(void* args)
                 masterXfer_I2C_write->slaveAddress = 0x50;
                 masterXfer_I2C_write->subaddress = (uint32_t) subaddress;
                 masterXfer_I2C_write->subaddressSize = 1;
-                xQueueSend(I2C_write_queue, &masterXfer_I2C_write,
+                xQueueSend(*pI2C_write_queue, &masterXfer_I2C_write,
                            portMAX_DELAY);
-                xSemaphoreTake(I2C_done, portMAX_DELAY);
-                xSemaphoreGive(I2C_done);
+                xSemaphoreTake(*pI2C_done, portMAX_DELAY);
+                xSemaphoreGive(*pI2C_done);
                 vTaskDelay(pdMS_TO_TICKS(100));
                 subaddress++;
             }
@@ -985,10 +1002,10 @@ void TerminalMenus_ReadRTCHour(void* args)
                 masterXfer_I2C_write->slaveAddress = 0x50;
                 masterXfer_I2C_write->subaddress = (uint32_t) 0x04;
                 masterXfer_I2C_write->subaddressSize = 1;
-                xQueueSend(I2C_write_queue, &masterXfer_I2C_write,
+                xQueueSend(*pI2C_write_queue, &masterXfer_I2C_write,
                            portMAX_DELAY);
-                xSemaphoreTake(I2C_done, portMAX_DELAY);
-                xSemaphoreGive(I2C_done);
+                xSemaphoreTake(*pI2C_done, portMAX_DELAY);
+                xSemaphoreGive(*pI2C_done);
                 vTaskDelay(pdMS_TO_TICKS(100));
                 printing_time_chars[0] = ((time_buffer_variable[2] & TensMask)
                         >> 4) + '0'; /**hours tens*/
@@ -1083,7 +1100,7 @@ void TerminalMenus_ReadRTCDate(void* args)
             i2c_master_transfer_t *masterXfer_I2C_write;
             uint8_t index;
             uint16_t subaddress = 0x05;
-            for (index; index < 2; index++)
+            for (index = 0; index < 2; index++)
             {
                 masterXfer_I2C_write = pvPortMalloc(
                         sizeof(i2c_master_transfer_t*));
@@ -1094,10 +1111,10 @@ void TerminalMenus_ReadRTCDate(void* args)
                 masterXfer_I2C_write->slaveAddress = 0x50;
                 masterXfer_I2C_write->subaddress = (uint32_t) subaddress;
                 masterXfer_I2C_write->subaddressSize = 1;
-                xQueueSend(I2C_write_queue, &masterXfer_I2C_write,
+                xQueueSend(*pI2C_write_queue, &masterXfer_I2C_write,
                            portMAX_DELAY);
-                xSemaphoreTake(I2C_done, portMAX_DELAY);
-                xSemaphoreGive(I2C_done);
+                xSemaphoreTake(*pI2C_done, portMAX_DELAY);
+                xSemaphoreGive(*pI2C_done);
                 vTaskDelay(pdMS_TO_TICKS(50));
                 subaddress++;
             }
@@ -1251,7 +1268,7 @@ void TerminalMenus_LCDEcho(void* args)
         {
             charToBeMirrored = pvPortMalloc(sizeof(SPI_msg_t*));
             charToBeMirrored->LCD_to_be_clear = pdTRUE;
-            xQueueSend(SPI_queue, &charToBeMirrored, portMAX_DELAY);
+            xQueueSend(*pSPI_queue, &charToBeMirrored, portMAX_DELAY);
 
             CheckIfReturnToMenu(UART_struct, charReceived, SPI_TASK);
         } else if (ENTER != charReceived)
@@ -1267,7 +1284,7 @@ void TerminalMenus_LCDEcho(void* args)
             stringBuffer[0] = charReceived;
             stringBuffer[1] = '\0';
             charToBeMirrored->string = stringBuffer;
-            xQueueSend(SPI_queue, &charToBeMirrored, portMAX_DELAY);
+            xQueueSend(*pSPI_queue, &charToBeMirrored, portMAX_DELAY);
         }
 
     }
@@ -1280,7 +1297,7 @@ void SPIReadHour(void * args)
     volatile int8_t time_buffer_variable[3];
     uint8_t printing_time_chars[9] = { '0' };
     SPI_msg_t *timeString;
-    static volatile i2c_master_transfer_t *masterXfer_I2C_write;
+     i2c_master_transfer_t *masterXfer_I2C_write;
     void * tempPointer;
     uint8_t index;
     uint16_t subaddress = 0x02;
@@ -1300,9 +1317,9 @@ void SPIReadHour(void * args)
             masterXfer_I2C_write->slaveAddress = 0x50;
             masterXfer_I2C_write->subaddress = (uint32_t) subaddress;
             masterXfer_I2C_write->subaddressSize = 1;
-            xQueueSend(I2C_write_queue, &masterXfer_I2C_write, portMAX_DELAY);
-            xSemaphoreTake(I2C_done, portMAX_DELAY);
-            xSemaphoreGive(I2C_done);
+            xQueueSend(*pI2C_write_queue, &masterXfer_I2C_write, portMAX_DELAY);
+            xSemaphoreTake(*pI2C_done, portMAX_DELAY);
+            xSemaphoreGive(*pI2C_done);
             vTaskDelay(pdMS_TO_TICKS(100));
             subaddress++;
         }
@@ -1325,20 +1342,20 @@ void SPIReadHour(void * args)
         timeString = pvPortMalloc(sizeof(SPI_msg_t*));
         timeString->LCD_to_be_clear = pdFALSE;
         timeString->string = HourString;
-        xQueueSend(SPI_queue, &timeString, portMAX_DELAY);
+        xQueueSend(*pSPI_queue, &timeString, portMAX_DELAY);
         vTaskDelay(pdMS_TO_TICKS(100));
 
         timeString = pvPortMalloc(sizeof(SPI_msg_t*));
         timeString->LCD_to_be_clear = pdFALSE;
         timeString->string = printing_time_chars;
-        xQueueSend(SPI_queue, &timeString, portMAX_DELAY);
+        xQueueSend(*pSPI_queue, &timeString, portMAX_DELAY);
         vTaskDelay(pdMS_TO_TICKS(100));
 
         uint8_t SpaceString[12] = { "            " };
         timeString = pvPortMalloc(sizeof(SPI_msg_t*));
         timeString->LCD_to_be_clear = pdFALSE;
         timeString->string = SpaceString;
-        xQueueSend(SPI_queue, &timeString, portMAX_DELAY);
+        xQueueSend(*pSPI_queue, &timeString, portMAX_DELAY);
         vTaskDelay(pdMS_TO_TICKS(100));
 
         subaddress = 0x05;
@@ -1352,9 +1369,9 @@ void SPIReadHour(void * args)
             masterXfer_I2C_write->slaveAddress = 0x50;
             masterXfer_I2C_write->subaddress = (uint32_t) subaddress;
             masterXfer_I2C_write->subaddressSize = 1;
-            xQueueSend(I2C_write_queue, &masterXfer_I2C_write, portMAX_DELAY);
-            xSemaphoreTake(I2C_done, portMAX_DELAY);
-            xSemaphoreGive(I2C_done);
+            xQueueSend(*pI2C_write_queue, &masterXfer_I2C_write, portMAX_DELAY);
+            xSemaphoreTake(*pI2C_done, portMAX_DELAY);
+            xSemaphoreGive(*pI2C_done);
             vTaskDelay(pdMS_TO_TICKS(100));
             subaddress++;
         }
@@ -1376,19 +1393,19 @@ void SPIReadHour(void * args)
         timeString = pvPortMalloc(sizeof(SPI_msg_t*));
         timeString->LCD_to_be_clear = pdFALSE;
         timeString->string = DateString;
-        xQueueSend(SPI_queue, &timeString, portMAX_DELAY);
+        xQueueSend(*pSPI_queue, &timeString, portMAX_DELAY);
         vTaskDelay(pdMS_TO_TICKS(100));
 
         timeString = pvPortMalloc(sizeof(SPI_msg_t*));
         timeString->LCD_to_be_clear = pdFALSE;
         timeString->string = printing_time_chars;
-        xQueueSend(SPI_queue, &timeString, portMAX_DELAY);
+        xQueueSend(*pSPI_queue, &timeString, portMAX_DELAY);
         vTaskDelay(pdMS_TO_TICKS(100));
 
         timeString = pvPortMalloc(sizeof(SPI_msg_t*));
         timeString->LCD_to_be_clear = pdFALSE;
         timeString->string = SpaceString;
-        xQueueSend(SPI_queue, &timeString, portMAX_DELAY);
+        xQueueSend(*pSPI_queue, &timeString, portMAX_DELAY);
         vTaskDelay(pdMS_TO_TICKS(100));
 
         vTaskDelayUntil(&xLastWakeTime, xPeriod);

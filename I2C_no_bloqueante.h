@@ -58,8 +58,9 @@
 #include "FreeRTOSConfig.h"
 
 
+SemaphoreHandle_t* pGetI2Mutex();
 void I2CInit();
-
+QueueHandle_t* pGetI2CHandler();
 void I2C_transfer() ;
 void inicializacion_I2C(void) ;
 

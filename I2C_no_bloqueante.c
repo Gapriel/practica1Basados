@@ -52,9 +52,7 @@
 volatile i2c_master_handle_t g_m_handle; //I2C_0 master handler declared
 
 volatile QueueHandle_t I2C_write_queue;
-volatile QueueHandle_t I2C_read_queue;
 volatile EventGroupHandle_t I2C_events;
-
 volatile SemaphoreHandle_t I2C_done;
 
 
@@ -75,6 +73,17 @@ static void i2c_master_callback(I2C_Type *base, i2c_master_handle_t *handle,
 
     portYIELD_FROM_ISR(pxHigherPriorityTaskWoken);
 }
+
+
+
+QueueHandle_t* pGetI2CHandler(){
+    return &I2C_write_queue;
+}
+
+SemaphoreHandle_t* pGetI2Mutex(){
+    return &I2C_done;
+}
+
 
 void I2CInit() {
     //clock enabling
@@ -107,8 +116,7 @@ void I2CInit() {
 
 void I2C_transfer() {
 
-    static i2c_master_transfer_t *masterXfer;
-    uint8_t valor_a_enviar[1];
+        i2c_master_transfer_t *masterXfer;
 
 //I2C_0 data block transmission
     while (1)
@@ -123,7 +131,6 @@ void I2C_transfer() {
         xEventGroupWaitBits(I2C_events, I2C_free, pdFALSE, pdTRUE,
                portMAX_DELAY);
 
-        vTaskDelay(pdMS_TO_TICKS(100));
         xSemaphoreGive(I2C_done);
         vPortFree(masterXfer);
     }
@@ -136,11 +143,9 @@ void inicializacion_I2C(void) {
     I2C_done = xSemaphoreCreateMutex();
 
     I2C_write_queue = xQueueCreate(1, sizeof(i2c_master_transfer_t*));
-    I2C_read_queue = xQueueCreate(1, sizeof(i2c_master_transfer_t*));
-
-    xTaskCreate(I2CInit, "Init I2C", configMINIMAL_STACK_SIZE , NULL, 4,
+    xTaskCreate(I2CInit, "Init I2C", configMINIMAL_STACK_SIZE , NULL, 5,
     NULL);
     xTaskCreate(I2C_transfer, "transfer", configMINIMAL_STACK_SIZE, NULL,
-                        4, NULL);
+                        5, NULL);
 
 }
