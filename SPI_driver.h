@@ -9,8 +9,8 @@
 #define SPI_DRIVER_H_
 
 #include "DataTypeDefinitions.h"
-#include "stdint.h"
-
+#include "FreeRTOS.h"
+#include "queue.h"
 
 #define STRING_MAX_LENGTH 30
 
@@ -21,8 +21,9 @@ typedef struct {
     uint8_t LCD_to_be_clear;
 } SPI_msg_t;
 
+QueueHandle_t* pGetSPIHandler();
 void SPI_configuration();
 void SPI_sendOneByte(uint8_t byte);
 void probandoSPI(void* args);
-
+void task_SPI_print(void*args);
 #endif /* SPI_DRIVER_H_ */

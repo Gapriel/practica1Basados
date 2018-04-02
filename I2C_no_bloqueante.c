@@ -49,57 +49,72 @@
 #include "FreeRTOSConfig.h"
 #include "I2C_no_bloqueante.h"
 
-static i2c_master_handle_t g_m_handle; //I2C_0 master handler declared
-
-QueueHandle_t I2C_write_queue;
-QueueHandle_t I2C_read_queue;
-EventGroupHandle_t I2C_events;
-
-SemaphoreHandle_t I2C_done;
-
-
 #define I2C_free (1<< 0)
 #define I2C_data_ready (1 << 1)
+#define MAX_WAITING_TIME (pdMS_TO_TICKS(500))  // Maximum Wwaiting time for the I2C device
+volatile i2c_master_handle_t g_m_handle; // I2C_0 master handler declared
 
+QueueHandle_t I2C_write_queue; /* Queue used for the transfer of the I2C */
+
+EventGroupHandle_t I2C_events; /* To check if the I2C is free */
+
+SemaphoreHandle_t I2C_done; /* Points that the I2C have finished the transfer */
+
+TaskHandle_t I2C_Transfer; /*Handler of the transfer task of the I2C */
+
+TimerHandle_t I2C_Timer_Handler; /*Handler for the I2C timer to check if the device is found */
+
+
+/* If the transfer is succesfull the I2C Events is Set to FreeI2C  */
 static void i2c_master_callback(I2C_Type *base, i2c_master_handle_t *handle,
                                 status_t status, void * userData) {
     BaseType_t pxHigherPriorityTaskWoken;
     pxHigherPriorityTaskWoken = pdFALSE;
     if (status == kStatus_Success)
     {
-
-            xEventGroupSetBitsFromISR(I2C_events, I2C_free,
-                                      &pxHigherPriorityTaskWoken);
-
+        xEventGroupSetBitsFromISR(I2C_events, I2C_free,
+                                  &pxHigherPriorityTaskWoken);
     }
 
     portYIELD_FROM_ISR(pxHigherPriorityTaskWoken);
 }
 
+/* Returns the address of the Event Group Handler of the I2C*/
+EventGroupHandle_t* pGetI2CEvents() {
+    return &I2C_events;
+}
+
+/* Returns the addres of the Queue Handler of the I2C Transfer */
+QueueHandle_t* pGetI2CHandler() {
+    return &I2C_write_queue;
+}
+
+/* Returns the Handler of the Mutex of the I2C */
+SemaphoreHandle_t* pGetI2Mutex() {
+    return &I2C_done;
+}
+
 void I2CInit() {
-    //clock enabling
-    CLOCK_EnableClock(kCLOCK_PortC); //I2C_1 pins port clock enabling
-    CLOCK_EnableClock(kCLOCK_I2c1); //I2C_1 clock enabling
+    /* Initialize the Events, Mutex and Timers of the I2C */
+    I2C_events = xEventGroupCreate();
+    I2C_done = xSemaphoreCreateMutex();
+    I2C_write_queue = xQueueCreate(1, sizeof(i2c_master_transfer_t*));
+    I2C_Timer_Handler = xTimerCreate("I2C Timer",
+                                     pdMS_TO_TICKS(MAX_WAITING_TIME), pdFALSE,
+                                     NULL,
+                                     I2C_restart);
 
-    //I2C_0 pins configuration
-    port_pin_config_t config_i2c = { kPORT_PullDisable, kPORT_SlowSlewRate,
-        kPORT_PassiveFilterDisable, kPORT_OpenDrainDisable,
-        kPORT_LowDriveStrength, kPORT_MuxAlt2, kPORT_UnlockRegister, };
-    PORT_SetPinConfig(PORTC, 10, &config_i2c);  //I2C_0 SCL pin configuration
-    PORT_SetPinConfig(PORTC, 11, &config_i2c);  //I2C_0 SDA pin configuration
-
-    //I2C_0 master configuration
-    i2c_master_config_t masterConfig;
-    I2C_MasterGetDefaultConfig(&masterConfig); //I2C_0 master default config. obtanined
-    masterConfig.baudRate_Bps = 100000;
-    I2C_MasterInit(I2C1, &masterConfig, CLOCK_GetFreq(kCLOCK_BusClk));
-
-    //I2C_0 master handler creation
+    /*I2C master handler creation*/
     I2C_MasterTransferCreateHandle(I2C1, &g_m_handle, i2c_master_callback,
     NULL);
-    NVIC_EnableIRQ(I2C1_IRQn);
-    NVIC_SetPriority(I2C1_IRQn, 6);
+    /*  Indicates that the I2C it's free to transfer */
     xEventGroupSetBits(I2C_events, I2C_free);
+    xSemaphoreGive(I2C_done);
+
+    /* Initialize the Transfer task to be ready to transfer */
+    xTaskCreate(I2C_transfer, "I2C Transfer", configMINIMAL_STACK_SIZE, NULL, 5,
+                I2C_Transfer);
+    /* Not needed anymore because it's just for configuration.*/
     vTaskDelete(NULL);
 
 }
@@ -107,65 +122,36 @@ void I2CInit() {
 void I2C_transfer() {
 
     i2c_master_transfer_t *masterXfer;
-    uint8_t valor_a_enviar[1];
 
-//I2C_0 data block transmission
+    /* I2C_0 data block transmission */
     while (1)
     {
-
+        /* Waits for a pointer of the i2c_master_t with the desired for the transfer */
         xQueueReceive(I2C_write_queue, &masterXfer, portMAX_DELAY);
 
+        /* Mutex to indicate that the I2C it's taken */
+        xSemaphoreTake(I2C_done, portMAX_DELAY);
+
+        /* Event Group to indicate that the I2C it's bussy */
         xEventGroupWaitBits(I2C_events, I2C_free, pdTRUE, pdTRUE,
         portMAX_DELAY);
+
+        /* Starts the timer of the I2C to prevent a block if the device is not found*/
+        xTimerStart(I2C_Timer_Handler, 0);
         I2C_MasterTransferNonBlocking(I2C1, &g_m_handle, masterXfer);
+
+        /* Waits for the I2C to finishes the transfer*/
         xEventGroupWaitBits(I2C_events, I2C_free, pdFALSE, pdTRUE,
-               portMAX_DELAY);
-        xQueueSend(I2C_read_queue,&masterXfer,portMAX_DELAY);
+        portMAX_DELAY);
 
+        /* waits for the I2C to be free */
+        xSemaphoreGive(I2C_done);
+
+        /* Stops the timer in case the transfer is completed */
+        xTimerStop(I2C_Timer_Handler, 0);
+
+        /* Releases the heap memory assigned for the queue transfer */
+        vPortFree(masterXfer);
     }
-
-}
-
-void I2C_prueba() {
-    i2c_master_transfer_t *masterXfer_write_read;
-    i2c_master_transfer_t *masterXfer_recibido;
-    uint8_t buffer_escritura[1] = {4};
-    masterXfer_write_read = pvPortMalloc(sizeof(i2c_master_transfer_t*));
-
-
-    //I2C_0 data block definition
-    masterXfer_write_read->slaveAddress = 0x50;
-    masterXfer_write_read->subaddress = 0x01;
-    masterXfer_write_read->subaddressSize = 2;
-    masterXfer_write_read->dataSize = 1;
-    masterXfer_write_read->flags = kI2C_TransferDefaultFlag;
-    masterXfer_write_read->direction = kI2C_Write;
-    masterXfer_write_read->data = buffer_escritura;
-
-    while (1)
-    {
-
-        xQueueSend(I2C_write_queue, &masterXfer_write_read, portMAX_DELAY);
-        xQueueReceive(I2C_read_queue, &masterXfer_write_read, portMAX_DELAY);
-
-
-        PRINTF("\r %i \n", masterXfer_write_read->data[0]);
-
-
-    }
-
-}
-
-void inicializacion_I2C(void) {
-
-    I2C_events = xEventGroupCreate();
-    I2C_done = xSemaphoreCreateBinary();
-    I2C_write_queue = xQueueCreate(1, sizeof(i2c_master_transfer_t*));
-    I2C_read_queue = xQueueCreate(1, sizeof(i2c_master_transfer_t*));
-
-    xTaskCreate(I2CInit, "Init I2C", configMINIMAL_STACK_SIZE + 200, NULL, 4,
-    NULL);
-    xTaskCreate(I2C_transfer, "transfer", configMINIMAL_STACK_SIZE + 200, NULL,
-                        1, NULL);
 
 }

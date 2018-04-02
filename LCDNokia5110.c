@@ -189,7 +189,7 @@ void LCDNokia_sendString(uint8 *characters)
 
 void LCDNokia_clear(void)
 {
-    uint16 index = 0;
+    uint16_t index = 0;
     for (index = 0; index < (LCD_X * LCD_Y / 8); index++)
         LCDNokia_writeByte(LCD_DATA, 0x00);
     LCDNokia_gotoXY(0, 0); //After we clear the display, return to the home position

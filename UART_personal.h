@@ -65,6 +65,13 @@
 
 typedef enum {UART_0,UART_1,UART_2}UART_NUMBER;
 
+typedef struct{
+    uint8_t terminalChatStates[2];
+    uint8_t chatPosition[8];
+    QueueHandle_t* UART0_send_Queue;
+    QueueHandle_t* UART1_send_Queue;
+    uint8_t FirstEntry[2];
+}chatStates_t;
 
 typedef struct{
 
@@ -74,6 +81,7 @@ typedef struct{
     QueueHandle_t* UART_receive_Queue;
     QueueHandle_t* UART_send_Queue;
     UART_NUMBER uart_number;
+    chatStates_t * ChatStates;
 }uart_struct;
 
 /*
@@ -91,6 +99,9 @@ void uart_receive_task(void*) ;
  * Funcion de inicializacion de la UART
  */
 void UART_tasks(void*) ;
+
+
+
 
 void SYSconfig_UARTConfiguration(uart_struct *UART_struct) ;
 

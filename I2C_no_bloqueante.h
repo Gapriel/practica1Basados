@@ -56,11 +56,73 @@
 #include "queue.h"
 #include "event_groups.h"
 #include "FreeRTOSConfig.h"
+#include "timers.h"
 
 
+
+
+/********************************************************************************************/
+/********************************************************************************************/
+/********************************************************************************************/
+/*!
+    \brief  Release the Transfer of the I2C if the dive is not found.
+     \param[in] TimerHandle_t
+    \return void
+ */
+void I2C_restart(TimerHandle_t handler);
+
+
+
+
+/********************************************************************************************/
+/********************************************************************************************/
+/********************************************************************************************/
+/*!
+    \brief  Function used to get the address of the EventGroupHandle of the I2C
+    \return The address of the handler of the events.
+ */
+EventGroupHandle_t* pGetI2CEvents();
+
+
+
+/********************************************************************************************/
+/********************************************************************************************/
+/********************************************************************************************/
+/*!
+    \brief  Function to get the SemaphoreHandler of the Mutex of the I2C
+    \return Address of the I2C Mutex Handler
+ */
+SemaphoreHandle_t* pGetI2Mutex();
+
+
+/********************************************************************************************/
+/********************************************************************************************/
+/********************************************************************************************/
+/*!
+    \brief  Task used to configure handlers and tasks of the I2C
+    \return void
+ */
 void I2CInit();
 
+
+/********************************************************************************************/
+/********************************************************************************************/
+/********************************************************************************************/
+/*!
+    \brief  Function to get the Queue Handler of the transfer function of the I2C
+    \return Address of the I2C queue handler
+ */
+QueueHandle_t* pGetI2CHandler();
+
+
+/********************************************************************************************/
+/********************************************************************************************/
+/********************************************************************************************/
+/*!
+    \brief  Task that uses the I2C_MasterTransferNonBlocking function protected by Events and Mutex
+    \brief  it makes the transfer of the received i2c_transfer_t* by a xQueueReceived of the I2C Transfer Handler
+    \return void
+ */
 void I2C_transfer() ;
-void inicializacion_I2C(void) ;
 
 #endif /* I2C_NO_BLOQUEANTE_H_ */

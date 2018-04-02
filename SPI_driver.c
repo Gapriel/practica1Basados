@@ -23,9 +23,10 @@
 
 //////////////**OS SPI resources declarations*//////////////////////////
 dspi_master_handle_t g_m_handle_I2C;
-dspi_transfer_t masterXfer_I2C;
+dspi_transfer_t masterXfer_SPI;
 SemaphoreHandle_t g_SPI_mutex;
 EventGroupHandle_t g_SPI_events;
+
 QueueHandle_t SPI_queue;
 
 //////////////////**user types definitions*////////////////////////////
@@ -39,6 +40,9 @@ typedef enum {
 
 
 
+QueueHandle_t* pGetSPIHandler(){
+    return &SPI_queue;
+}
 void task_SPI_print();
 /////////////////////**module callbacks*///////////////////////////////
 void DSPI_MasterUserCallback(SPI_Type *base, dspi_master_handle_t *handle,
@@ -75,10 +79,11 @@ void SPI_configuration()
 #endif
     DSPI_MasterInit(SPI0, &masterConfig, CLOCK_GetBusClkFreq());
     NVIC_enableInterruptAndPriotity(SPI0_IRQn, 7);
+
+   xTaskCreate(task_SPI_print, "spi printing task", configMINIMAL_STACK_SIZE, (void*)NULL, 5, NULL);
     DSPI_MasterTransferCreateHandle(SPI0, &g_m_handle_I2C, DSPI_MasterUserCallback,
                                     NULL);
     //NVIC_enableInterruptAndPriotity(SPI0_IRQn,5);
-    xTaskCreate(task_SPI_print, "spi printing task", 150, (void*)NULL, 1, NULL);
 #if DEBUG_SPI_CONFIGURE_AS_IN_DSPS
     DSPI_SetFifoEnable(SPI0, false, false);
     DSPI_Enable(SPI0, true);
@@ -90,14 +95,14 @@ void SPI_sendOneByte(uint8_t byte)
 {
     uint8_t masterTxData[1];
     masterTxData[0] = byte;
-    masterXfer_I2C.txData = masterTxData;
-    masterXfer_I2C.rxData = NULL;
-    masterXfer_I2C.dataSize = sizeof(masterTxData);
-    masterXfer_I2C.configFlags = kDSPI_MasterCtar0
+    masterXfer_SPI.txData = masterTxData;
+    masterXfer_SPI.rxData = NULL;
+    masterXfer_SPI.dataSize = sizeof(masterTxData);
+    masterXfer_SPI.configFlags = kDSPI_MasterCtar0
             | EXAMPLE_DSPI_MASTER_PCS_FOR_TRANSFER | kDSPI_MasterPcsContinuous;
 
     xSemaphoreTake(g_SPI_mutex,portMAX_DELAY);     /**MUTEX take*/
-    DSPI_MasterTransferNonBlocking(SPI0, &g_m_handle_I2C, &masterXfer_I2C);
+    DSPI_MasterTransferNonBlocking(SPI0, &g_m_handle_I2C, &masterXfer_SPI);
     xSemaphoreGive(g_SPI_mutex);                    /**MUTEX release in callback */
 
     xEventGroupWaitBits(g_SPI_events, SPI_TRANSFER_IN_PROGRESS, pdTRUE, pdTRUE, portMAX_DELAY);
@@ -105,7 +110,8 @@ void SPI_sendOneByte(uint8_t byte)
 }
 
 
-void task_SPI_print(){
+void task_SPI_print(void*args){
+    vTaskDelay(pdMS_TO_TICKS(500));
     static SPI_msg_t *message;
     for(;;){
         xQueueReceive(SPI_queue, &message, portMAX_DELAY);
