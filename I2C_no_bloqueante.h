@@ -2,7 +2,8 @@
  * I2C_no_bloqueante.h
  *
  *  Created on: Mar 24, 2018
- *      Author: Paco
+ *      Author: Avelar Díaz José Francisco      ie704217@iteso.mx
+ *      Author: Santamaría García Gabriel       ie699356@iteso.mx
  */
 
 #ifndef I2C_NO_BLOQUEANTE_H_
@@ -79,7 +80,7 @@ void I2C_restart(TimerHandle_t handler);
 /********************************************************************************************/
 /*!
     \brief  Function used to get the address of the EventGroupHandle of the I2C
-    \return The address of the handler of the events.
+    \return EventGroupHandle_t*  The address of the handler of the events.
  */
 EventGroupHandle_t* pGetI2CEvents();
 
@@ -90,7 +91,7 @@ EventGroupHandle_t* pGetI2CEvents();
 /********************************************************************************************/
 /*!
     \brief  Function to get the SemaphoreHandler of the Mutex of the I2C
-    \return Address of the I2C Mutex Handler
+    \return SemaphoreHandle_t* Address of the I2C Mutex Handler
  */
 SemaphoreHandle_t* pGetI2Mutex();
 
@@ -110,7 +111,7 @@ void I2CInit();
 /********************************************************************************************/
 /*!
     \brief  Function to get the Queue Handler of the transfer function of the I2C
-    \return Address of the I2C queue handler
+    \return QueueHandle_t* Address of the I2C queue handler
  */
 QueueHandle_t* pGetI2CHandler();
 

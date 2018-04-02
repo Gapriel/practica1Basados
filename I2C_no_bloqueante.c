@@ -28,9 +28,9 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-/**
- * @file    I2C_no_bloqueante.c
- * @brief   Application entry point.
+/*
+ *      Author: Avelar Díaz José Francisco      ie704217@iteso.mx
+ *      Author: Santamaría García Gabriel       ie699356@iteso.mx
  */
 #include <stdio.h>
 #include "board.h"
@@ -49,10 +49,16 @@
 #include "FreeRTOSConfig.h"
 #include "I2C_no_bloqueante.h"
 
-#define I2C_free (1<< 0)
-#define I2C_data_ready (1 << 1)
-#define MAX_WAITING_TIME (pdMS_TO_TICKS(500))  // Maximum Wwaiting time for the I2C device
-volatile i2c_master_handle_t g_m_handle; // I2C_0 master handler declared
+////////////////////////////////** For the Events of the I2C  **/////////////////////////////
+#define I2C_free (1<< 0)                                                                   //
+#define I2C_data_ready (1 << 1)                                                            //
+/////////////////////////////////////////////////////////////////////////////////////////////
+
+#define MAX_WAITING_TIME (pdMS_TO_TICKS(500))  /* Maximum Wwaiting time for the I2C device */
+
+//////////////**OS I2C resources declarations*///////////////////////////////////////////////
+
+i2c_master_handle_t g_m_handle; /* I2C_0 master handler declared */
 
 QueueHandle_t I2C_write_queue; /* Queue used for the transfer of the I2C */
 
@@ -64,10 +70,11 @@ TaskHandle_t I2C_Transfer; /*Handler of the transfer task of the I2C */
 
 TimerHandle_t I2C_Timer_Handler; /*Handler for the I2C timer to check if the device is found */
 
-
-/* If the transfer is succesfull the I2C Events is Set to FreeI2C  */
+/////////////////////**module callbacks*//////////////////////////////////////////////////////
 static void i2c_master_callback(I2C_Type *base, i2c_master_handle_t *handle,
                                 status_t status, void * userData) {
+
+    /* If the transfer is succesfull the I2C Events is Set to FreeI2C  */
     BaseType_t pxHigherPriorityTaskWoken;
     pxHigherPriorityTaskWoken = pdFALSE;
     if (status == kStatus_Success)
@@ -78,6 +85,9 @@ static void i2c_master_callback(I2C_Type *base, i2c_master_handle_t *handle,
 
     portYIELD_FROM_ISR(pxHigherPriorityTaskWoken);
 }
+
+
+
 
 /* Returns the address of the Event Group Handler of the I2C*/
 EventGroupHandle_t* pGetI2CEvents() {
