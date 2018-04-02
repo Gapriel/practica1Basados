@@ -1268,86 +1268,86 @@ void TerminalMenus_TerminalsCommunication(void* args)
 
                 uint8_t messageZonePosition[] = { "\033[04;10H\0" }; /**VT100 command to establish the message indication zone string*/
                 toSend_UART = pvPortMalloc(sizeof(uart_transfer_t*)); /**memory is reserved for a UART transference*/
-                toSend_UART->data = messageZonePosition;
+                toSend_UART->data = messageZonePosition; /**the data to be sent will be the position VT100 command for the message printing in the terminal*/
                 xQueueSend(*UART_struct->ChatStates->UART0_send_Queue,
-                           &toSend_UART, portMAX_DELAY);
+                           &toSend_UART, portMAX_DELAY);    /**sends info to the terminal 1*/
                 vTaskDelay(pdMS_TO_TICKS(20)); /**gives time for the UART to properly print the string sent*/
-                toSend_UART = pvPortMalloc(sizeof(uart_transfer_t*));
-                toSend_UART->data = messageZonePosition;
+                toSend_UART = pvPortMalloc(sizeof(uart_transfer_t*)); /**memory is reserved for a UART transference*/
+                toSend_UART->data = messageZonePosition; /**the data to be sent will be the position VT100 command for the message printing in the terminal*/
                 xQueueSend(*UART_struct->ChatStates->UART1_send_Queue,
-                           &toSend_UART, portMAX_DELAY);
+                           &toSend_UART, portMAX_DELAY); /**sends info to the terminal 2*/
                 vTaskDelay(pdMS_TO_TICKS(20)); /**gives time for the UART to properly print the string sent*/
                 uint8_t messageZone[] = { "Mensaje a enviar:" };
-                toSend_UART = pvPortMalloc(sizeof(uart_transfer_t*));
-                toSend_UART->data = messageZone;
+                toSend_UART = pvPortMalloc(sizeof(uart_transfer_t*)); /**memory is reserved for a UART transference*/
+                toSend_UART->data = messageZone; /**the data to be sent will be a string*/
                 xQueueSend(*UART_struct->ChatStates->UART0_send_Queue,
-                           &toSend_UART, portMAX_DELAY);
+                           &toSend_UART, portMAX_DELAY); /**sends info to the terminal 1*/
                 vTaskDelay(pdMS_TO_TICKS(20)); /**gives time for the UART to properly print the string sent*/
-                toSend_UART = pvPortMalloc(sizeof(uart_transfer_t*));
-                toSend_UART->data = messageZone;
+                toSend_UART = pvPortMalloc(sizeof(uart_transfer_t*)); /**memory is reserved for a UART transference*/
+                toSend_UART->data = messageZone; /**the data to be sent will be a string*/
                 xQueueSend(*UART_struct->ChatStates->UART1_send_Queue,
-                           &toSend_UART, portMAX_DELAY);
+                           &toSend_UART, portMAX_DELAY); /**sends info to the terminal 2*/
                 vTaskDelay(pdMS_TO_TICKS(20)); /**gives time for the UART to properly print the string sent*/
 
                 UART_struct->ChatStates->chatPosition[3] = '5';
                 toSend_UART = pvPortMalloc(sizeof(uart_transfer_t*)); /**memory is reserved for a UART transference*/
                 toSend_UART->data = UART_struct->ChatStates->chatPosition; /**the data to be sent through the UART is the shared terminal position*/
                 xQueueSend(*UART_struct->ChatStates->UART0_send_Queue,
-                           &toSend_UART, portMAX_DELAY);
+                           &toSend_UART, portMAX_DELAY); /**sends info to the terminal 1*/
                 vTaskDelay(pdMS_TO_TICKS(20)); /**gives time for the UART to properly print the string sent*/
                 toSend_UART = pvPortMalloc(sizeof(uart_transfer_t*)); /**memory is reserved for a UART transference*/
                 toSend_UART->data = UART_struct->ChatStates->chatPosition; /**the data to be sent through the UART is the shared terminal position*/
                 xQueueSend(*UART_struct->ChatStates->UART1_send_Queue,
-                           &toSend_UART, portMAX_DELAY);
+                           &toSend_UART, portMAX_DELAY); /**sends info to the terminal 2*/
                 vTaskDelay(pdMS_TO_TICKS(20)); /**gives time for the UART to properly print the string sent*/
             }
         }
 
-        vTaskDelay(pdMS_TO_TICKS(50));
+        vTaskDelay(pdMS_TO_TICKS(50)); /**stalls the procedure for a short time to ensure proper flags reading*/
         receivedFromUart = xQueueReceive(*UART_struct->UART_receive_Queue,
-                                         &received_UART, pdMS_TO_TICKS(100));
+                                         &received_UART, pdMS_TO_TICKS(100)); /**receives from the terminal a char*/
 
         if (pdTRUE == (UART_struct->ChatStates->terminalChatStates[UART_0])
                 && pdTRUE
                         == (UART_struct->ChatStates->terminalChatStates[UART_1]))
-        {
+        { /**if both terminals are in the chat menu*/
 
             if (pdTRUE == receivedFromUart)
-            {
-                charReceived[0] = *received_UART->data;
+            { /**if something was received in the UART queue*/
+                charReceived[0] = *received_UART->data; /**the received char is stored*/
                 CharacterValidator(&LineMover, Terminal2Communication,
-                                   charReceived[0]);
+                                   charReceived[0]); /**the received char is validated to see if its a valid menu char*/
 
                 toSend_UART = pvPortMalloc(sizeof(uart_transfer_t*)); /**memory is reserved for a UART transference*/
                 toSend_UART->data =
-                        UART_struct->ChatStates->localPosition[UART_struct->uart_number].localPrint;
+                        UART_struct->ChatStates->localPosition[UART_struct->uart_number].localPrint; /**the data to be sent will be the local terminal position*/
                 xQueueSend(*UART_struct->UART_send_Queue, &toSend_UART,
                            portMAX_DELAY); /**sends content through the UART queue to be printed in the terminal*/
                 vTaskDelay(pdMS_TO_TICKS(20)); /**gives time for the UART to properly print the string sent*/
 
                 localPositionUnits =
                         UART_struct->ChatStates->localPosition[UART_struct->uart_number].localPrint[6]
-                                - 0x30;
+                                - 0x30; /**the local position units are converted from ascii to decimal*/
                 localPositionTens =
                         UART_struct->ChatStates->localPosition[UART_struct->uart_number].localPrint[5]
-                                - 0x30;
+                                - 0x30; /**the local position tens are converted from ascii to decimal*/
                 realLocalPosition = (localPositionTens * 10)
-                        + localPositionUnits;
-                realLocalPosition++;
-                localPositionTens = realLocalPosition / 10;
+                        + localPositionUnits; /**the previous variables are joined to form the true local horizontal position*/
+                realLocalPosition++; /**the local terminal position is increased in 1 space horizontally*/
+                localPositionTens = realLocalPosition / 10; /**then the previously modified position is separed in tens*/
                 localPositionUnits = realLocalPosition
-                        - (localPositionTens * 10);
+                        - (localPositionTens * 10); /**then the previously modified position is separed in units*/
                 UART_struct->ChatStates->localPosition[UART_struct->uart_number].localPrint[5] =
-                        (localPositionTens) + '0';
+                        (localPositionTens) + '0'; /**the new local position tens are converted back to ascii and stored in the local position string*/
                 UART_struct->ChatStates->localPosition[UART_struct->uart_number].localPrint[6] =
-                        (localPositionUnits) + '0';
+                        (localPositionUnits) + '0'; /**the new local position units are converted back to ascii and stored in the local position string*/
 
                 if ((RETURN != charReceived[0]) && (ENTER != charReceived[0]))
-                {
-                    charReceived[1] = '\0';
-                    FIFO_push(UART_struct->uart_number, charReceived[0]);
+                { /**if the received char is neither enter nor return*/
+                    charReceived[1] = '\0'; /**the received char array is asured to end with an end of char char*/
+                    FIFO_push(UART_struct->uart_number, charReceived[0]); /**pushes the local terminal received char in the local terminal fifo*/
                     toSend_UART = pvPortMalloc(sizeof(uart_transfer_t*)); /**memory is reserved for a UART transference*/
-                    toSend_UART->data = charReceived;
+                    toSend_UART->data = charReceived; /**the data to be sent to the uart will be the received char*/
                     xQueueSend(*UART_struct->UART_send_Queue, &toSend_UART,
                                portMAX_DELAY); /**sends content through the UART queue to be printed in the terminal*/
                     vTaskDelay(pdMS_TO_TICKS(20)); /**gives time for the UART to properly print the string sent*/
@@ -1355,40 +1355,41 @@ void TerminalMenus_TerminalsCommunication(void* args)
                 }
 
                 if (RETURN == charReceived[0])
-                {
+                { /**if the received char is a return to main menu,*/
 
                     toSend_UART = pvPortMalloc(sizeof(uart_transfer_t*)); /**memory is reserved for a UART transference*/
                     toSend_UART->data = UART_struct->ChatStates->chatPosition; /**the data to be sent through the UART is the shared terminal position*/
                     xQueueSend(*UART_struct->ChatStates->UART0_send_Queue,
-                               &toSend_UART, portMAX_DELAY);
+                               &toSend_UART, portMAX_DELAY); /**data will be sent to the terminal 1*/
                     vTaskDelay(pdMS_TO_TICKS(20)); /**gives time for the UART to properly print the string sent*/
                     toSend_UART = pvPortMalloc(sizeof(uart_transfer_t*));
                     toSend_UART->data = UART_struct->ChatStates->chatPosition; /**the data to be sent through the UART is the shared terminal position*/
                     xQueueSend(*UART_struct->ChatStates->UART1_send_Queue,
-                               &toSend_UART, portMAX_DELAY);
+                               &toSend_UART, portMAX_DELAY); /**data will be sent to the terminal 2*/
                     vTaskDelay(pdMS_TO_TICKS(20)); /**gives time for the UART to properly print the string sent*/
                     if ((UART_1 == UART_struct->uart_number)
                             && pdTRUE
                                     == (UART_struct->ChatStates->terminalChatStates[UART_0]))
-                    {
-                        uint8_t byebye[] = { "Terminal 2 se desconecto" };
+                    { /**if the current terminal to exit is uart 1 and the other terminal is inside the chat menu,*/
+                        uint8_t byebye[] = { "Terminal 2 se desconecto" }; /**exiting message to be sent to the other uart*/
                         toSend_UART = pvPortMalloc(sizeof(uart_transfer_t*)); /**memory is reserved for a UART transference*/
-                        toSend_UART->data = byebye;
+                        toSend_UART->data = byebye; /**the data to be sent will be the exiting message*/
                         xQueueSend(*UART_struct->ChatStates->UART0_send_Queue,
-                                   &toSend_UART, portMAX_DELAY);
+                                   &toSend_UART, portMAX_DELAY); /**data is sent to the terminal 1*/
                         vTaskDelay(pdMS_TO_TICKS(20)); /**gives time for the UART to properly print the string sent*/
                     } else if ((UART_0 == UART_struct->uart_number)
                             && pdTRUE
                                     == (UART_struct->ChatStates->terminalChatStates[UART_1]))
-                    {
-                        uint8_t byebye[] = { "Terminal 1 se desconecto" };
+                    { /**if the current terminal to exit is uart 1 and the other terminal is inside the chat menu,*/
+                        uint8_t byebye[] = { "Terminal 1 se desconecto" }; /**exiting message to be sent to the other uart*/
                         toSend_UART = pvPortMalloc(sizeof(uart_transfer_t*)); /**memory is reserved for a UART transference*/
-                        toSend_UART->data = byebye;
+                        toSend_UART->data = byebye; /**the data to be sent will be the exiting message*/
                         xQueueSend(*UART_struct->ChatStates->UART1_send_Queue,
-                                   &toSend_UART, portMAX_DELAY);
+                                   &toSend_UART, portMAX_DELAY);  /**data is sent to the terminal 2*/
                         vTaskDelay(pdMS_TO_TICKS(20)); /**gives time for the UART to properly print the string sent*/
                     }
 
+                    /**current terminal chat structure reset*/
                     UART_struct->ChatStates->FirstEntry[UART_struct->uart_number] =
                     pdFALSE;
                     UART_struct->ChatStates->chatPosition[0] = '\033';
@@ -1420,53 +1421,57 @@ void TerminalMenus_TerminalsCommunication(void* args)
                             'H';
                     UART_struct->ChatStates->localPosition[UART_struct->uart_number].localPrint[8] =
                             '\0';
+
                     vPortFree(received_UART); //the previously reserved memory used for the UART capture is liberated
-                    CheckIfReturnToMenu(UART_struct, charReceived[0], 2);
+                    CheckIfReturnToMenu(UART_struct, charReceived[0], 2); /**calls the change menu function*/
                 }
 
                 if (ENTER == charReceived[0])
-                {
+                { /**if the received char was an enter (i.e. sent to the chat),*/
                     toSend_UART = pvPortMalloc(sizeof(uart_transfer_t*)); /**memory is reserved for a UART transference*/
                     toSend_UART->data = UART_struct->ChatStates->chatPosition; /**the data to be sent through the UART is the shared terminal position*/
                     xQueueSend(*UART_struct->ChatStates->UART0_send_Queue,
-                               &toSend_UART, portMAX_DELAY);
+                               &toSend_UART, portMAX_DELAY); /**data is sent to the terminal 1*/
                     vTaskDelay(pdMS_TO_TICKS(20)); /**gives time for the UART to properly print the string sent*/
                     toSend_UART = pvPortMalloc(sizeof(uart_transfer_t*)); /**memory is reserved for a UART transference*/
                     toSend_UART->data = UART_struct->ChatStates->chatPosition; /**the data to be sent through the UART is the shared terminal position*/
                     xQueueSend(*UART_struct->ChatStates->UART1_send_Queue,
-                               &toSend_UART, portMAX_DELAY);
+                               &toSend_UART, portMAX_DELAY); /**data is sent to the terminal 2*/
                     vTaskDelay(pdMS_TO_TICKS(20)); /**gives time for the UART to properly print the string sent*/
 
-                    uint8_t terminalSpeaker[] = { "Terminal x: " };
+                    uint8_t terminalSpeaker[] = { "Terminal x: " }; /**message that will say which terminal has sent the message*/
                     toSend_UART = pvPortMalloc(sizeof(uart_transfer_t*)); /**memory is reserved for a UART transference*/
                     terminalSpeaker[9] =
-                            (UART_0 == UART_struct->uart_number) ? '1' : '2';
-                    toSend_UART->data = terminalSpeaker;
+                            (UART_0 == UART_struct->uart_number) ? '1' : '2'; /**according to which terminal is sending
+                                                                              the message, the terminal speaker message
+                                                                              changes its number at the end of the string*/
+                    toSend_UART->data = terminalSpeaker; /**the data to be sent will be the terminal speaker message*/
                     xQueueSend(*UART_struct->ChatStates->UART0_send_Queue,
-                               &toSend_UART, portMAX_DELAY);
+                               &toSend_UART, portMAX_DELAY); /**data is sent to the terminal 1*/
                     vTaskDelay(pdMS_TO_TICKS(20)); /**gives time for the UART to properly print the string sent*/
                     toSend_UART = pvPortMalloc(sizeof(uart_transfer_t*)); /**memory is reserved for a UART transference*/
-                    toSend_UART->data = terminalSpeaker;
+                    toSend_UART->data = terminalSpeaker; /**the data to be sent will be the terminal speaker message*/
                     xQueueSend(*UART_struct->ChatStates->UART1_send_Queue,
-                               &toSend_UART, portMAX_DELAY);
+                               &toSend_UART, portMAX_DELAY); /**data is sent to the terminal 2*/
                     vTaskDelay(pdMS_TO_TICKS(20)); /**gives time for the UART to properly print the string sent*/
 
                     while (pdTRUE != FIFO_checkIfEmpty(UART_struct->uart_number))
-                    {
-                        charToBePrinted[0] = FIFO_pop(UART_struct->uart_number);
-                        charToBePrinted[1] = '\0';
+                    { /**while there is something to take out from the fifo,*/
+                        charToBePrinted[0] = FIFO_pop(UART_struct->uart_number); /**takes the char to be printed from the fifo*/
+                        charToBePrinted[1] = '\0'; /**the char to be printed is assured to end with an end of char char*/
                         toSend_UART = pvPortMalloc(sizeof(uart_transfer_t*)); /**memory is reserved for a UART transference*/
-                        toSend_UART->data = charToBePrinted;
+                        toSend_UART->data = charToBePrinted; /**the data to be printed will be the popped char*/
                         xQueueSend(*UART_struct->ChatStates->UART0_send_Queue,
-                                   &toSend_UART, portMAX_DELAY);
+                                   &toSend_UART, portMAX_DELAY); /**data is sent to the terminal 1*/
                         vTaskDelay(pdMS_TO_TICKS(20)); /**gives time for the UART to properly print the string sent*/
                         toSend_UART = pvPortMalloc(sizeof(uart_transfer_t*)); /**memory is reserved for a UART transference*/
-                        toSend_UART->data = charToBePrinted;
+                        toSend_UART->data = charToBePrinted; /**the data to be printed will be the popped char*/
                         xQueueSend(*UART_struct->ChatStates->UART1_send_Queue,
-                                   &toSend_UART, portMAX_DELAY);
+                                   &toSend_UART, portMAX_DELAY); /**data is sent to the terminal 2*/
                         vTaskDelay(pdMS_TO_TICKS(20)); /**gives time for the UART to properly print the string sent*/
                     }
 
+                    /**the vertical shared position is increased*/
                     sharedPositionUnits =
                             UART_struct->ChatStates->chatPosition[3] - 0x30;
                     sharedPositionTens =
@@ -1482,6 +1487,7 @@ void TerminalMenus_TerminalsCommunication(void* args)
                     UART_struct->ChatStates->chatPosition[3] =
                             (sharedPositionUnits) + '0';
 
+                    /**the local terminal position is set to the top margin*/
                     UART_struct->ChatStates->localPosition[UART_struct->uart_number].localPrint[0] =
                             '\033';
                     UART_struct->ChatStates->localPosition[UART_struct->uart_number].localPrint[1] =
@@ -1503,22 +1509,23 @@ void TerminalMenus_TerminalsCommunication(void* args)
 
                     toSend_UART = pvPortMalloc(sizeof(uart_transfer_t*)); /**memory is reserved for a UART transference*/
                     toSend_UART->data =
-                            UART_struct->ChatStates->localPosition[UART_struct->uart_number].localPrint;
+                            UART_struct->ChatStates->localPosition[UART_struct->uart_number].localPrint; /**the data to be printed will be the local position*/
                     xQueueSend(*UART_struct->UART_send_Queue, &toSend_UART,
                                portMAX_DELAY); /**sends content through the UART queue to be printed in the terminal*/
                     vTaskDelay(pdMS_TO_TICKS(20)); /**gives time for the UART to properly print the string sent*/
 
-                    uint8_t index;
-                    uint8_t writeZoneCleaner[] = { " \0" };
+                    uint8_t index; /**index variable for the for loop*/
+                    uint8_t writeZoneCleaner[] = { " \0" }; /**char used for cleaning the top space*/
                     for (index = 0; index < 51; index++)
-                    {
+                    { /**loop that clears space by space the upmost space*/
                         toSend_UART = pvPortMalloc(sizeof(uart_transfer_t*)); /**memory is reserved for a UART transference*/
-                        toSend_UART->data = writeZoneCleaner;
+                        toSend_UART->data = writeZoneCleaner; /**the data to be sent will be the cleaning char*/
                         xQueueSend(*UART_struct->UART_send_Queue, &toSend_UART,
                                    portMAX_DELAY); /**sends content through the UART queue to be printed in the terminal*/
                         vTaskDelay(pdMS_TO_TICKS(20)); /**gives time for the UART to properly print the string sent*/
                     }
 
+                    /**the local terminal position is set to the top margin*/
                     UART_struct->ChatStates->localPosition[UART_struct->uart_number].localPrint[0] =
                             '\033';
                     UART_struct->ChatStates->localPosition[UART_struct->uart_number].localPrint[1] =
@@ -1540,22 +1547,23 @@ void TerminalMenus_TerminalsCommunication(void* args)
 
                     toSend_UART = pvPortMalloc(sizeof(uart_transfer_t*)); /**memory is reserved for a UART transference*/
                     toSend_UART->data =
-                            UART_struct->ChatStates->localPosition[UART_struct->uart_number].localPrint;
+                            UART_struct->ChatStates->localPosition[UART_struct->uart_number].localPrint; /**the data to be sent will be the local position*/
                     xQueueSend(*UART_struct->UART_send_Queue, &toSend_UART,
                                portMAX_DELAY); /**sends content through the UART queue to be printed in the terminal*/
                     vTaskDelay(pdMS_TO_TICKS(20)); /**gives time for the UART to properly print the string sent*/
 
-                    charReceived[0] = '\0';
+                    charReceived[0] = '\0'; /**the received char variable is cleaned for future receptions*/
                 }
             }
         } else if (pdTRUE
                 == UART_struct->ChatStates->terminalChatStates[UART_struct->uart_number])
-        {
+        { /**if only one terminal is inside the terminal chat*/
             if (pdTRUE == receivedFromUart)
-            {
-                charReceived[0] = *received_UART->data;
-                if (RETURN == charReceived[0])
+            { /**if something was actually received from the UART Queue*/
+                charReceived[0] = *received_UART->data; /**the char received is stored*/
+                if (RETURN == charReceived[0]) /**the char received is asured to end with an end of char char*/
                 {
+                    /**current terminal chat structure reset*/
                     UART_struct->ChatStates->FirstEntry[UART_struct->uart_number] =
                             pdFALSE;
                     UART_struct->ChatStates->chatPosition[0] = '\033';
@@ -1588,7 +1596,7 @@ void TerminalMenus_TerminalsCommunication(void* args)
                     UART_struct->ChatStates->localPosition[UART_struct->uart_number].localPrint[8] =
                             '\0';
 
-                    CheckIfReturnToMenu(UART_struct, charReceived[0], 2);
+                    CheckIfReturnToMenu(UART_struct, charReceived[0], 2); /**calls the change menu function*/
                 }
                 vPortFree(received_UART); //the previously reserved memory used for the UART capture is liberated
             }
@@ -1649,15 +1657,15 @@ void TerminalMenus_LCDEcho(void* args)
 
 void SPIReadHour(void * args)
 {
-    TickType_t xLastWakeTime;
-    const TickType_t xPeriod = pdMS_TO_TICKS(1000);
-    volatile int8_t time_buffer_variable[3];
-    uint8_t printing_time_chars[9] = { '0' };
-    SPI_msg_t *timeString;
-    i2c_master_transfer_t *masterXfer_I2C_write;
+    TickType_t xLastWakeTime; /**variable used to know when was the last wake time*/
+    const TickType_t xPeriod = pdMS_TO_TICKS(1000); /**the task period will be of 1s*/
+    volatile int8_t time_buffer_variable[3]; /**rtc time reading buffer*/
+    uint8_t printing_time_chars[9] = { '0' }; /**array that will hould the hour/date info to be printed on the spi screen*/
+    SPI_msg_t *timeString; /**where the printing time chars will be concatenated for posterior sending*/
+    i2c_master_transfer_t *masterXfer_I2C_write; /**master transfer variable used for I2C transfers*/
     void * tempPointer;
     uint8_t index;
-    uint16_t subaddress = 0x02;
+    uint16_t subaddress = 0x02; /***/
     vTaskDelay(pdMS_TO_TICKS(1000));
     for (;;)
     {
