@@ -56,12 +56,6 @@
 #include "terminal_menus.h"
 #define STACK_SIZE 150
 
-#define FREE_MEM_EVENT (1<<0)
-#define FREE_RTC_EVENT (1<< 1)
-
-
-
-
 QueueHandle_t UART0_send_Queue;
 QueueHandle_t UART0_receive_Queue;
 uart_handle_t g_uart0Handle;
@@ -74,13 +68,14 @@ EventGroupHandle_t g_UART1_Events;
 
 chatStates_t TerminalChatStates = {
     {pdFALSE,pdFALSE},
-    {"\033[12;10H"},
+    {"\033[12;10H\0"},
     &UART0_send_Queue,
     &UART1_send_Queue,
-    {pdFALSE,pdFALSE}
+    {pdFALSE,pdFALSE},
+    {{"\033[05;10H\0"},{"\033[05;10H\0"}}
 };
 
-uart_struct UART_0_struct = {
+static uart_struct UART_0_struct = {
         UART0,
         &g_uart0Handle,
         &g_UART0_Events,
@@ -91,7 +86,7 @@ uart_struct UART_0_struct = {
 };
 
 
-uart_struct UART_1_struct = {
+static uart_struct UART_1_struct = {
         UART1,
         &g_uart1Handle,
         &g_UART1_Events,
@@ -100,6 +95,7 @@ uart_struct UART_1_struct = {
         UART_1,
         &TerminalChatStates
 };
+
 
 
 int main(void) {

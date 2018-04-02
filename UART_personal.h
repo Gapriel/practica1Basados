@@ -67,10 +67,13 @@ typedef enum {UART_0,UART_1,UART_2}UART_NUMBER;
 
 typedef struct{
     uint8_t terminalChatStates[2];
-    uint8_t chatPosition[8];
+    uint8_t  chatPosition[9];
     QueueHandle_t* UART0_send_Queue;
     QueueHandle_t* UART1_send_Queue;
     uint8_t FirstEntry[2];
+    struct {
+        uint8_t localPrint[9];
+    }localPosition[2];
 }chatStates_t;
 
 typedef struct{
