@@ -37,8 +37,9 @@
 #include "task.h"
 #include "semphr.h"
 #include "event_groups.h"
-#include "fsl_port.h"
+#include "queue.h"
 #include "fsl_debug_console.h"
+#include "fsl_port.h"
 /*******************************************************************************
  * Definitions
  ******************************************************************************/
@@ -49,6 +50,7 @@
 #define txOnOffGoing (1 << 0)
 #define rxOnOffGoing (1 << 1)
 #define send_event (1 << 2)
+
 /*******************************************************************************
  * Prototypes
  ******************************************************************************/
@@ -60,12 +62,17 @@ void UART_UserCallback(UART_Type *base, uart_handle_t *handle, status_t status,
 /*******************************************************************************
  * Variables
  ******************************************************************************/
+/*
+ uart_handle_t g_uartHandle;
 
+ QueueHandle_t UART_receive_Queue;
+ QueueHandle_t UART_send_Queue;
 
+ EventGroupHandle_t g_UART_Events_personal;
+ */
 /*******************************************************************************
  * Code
  ******************************************************************************/
-
 
 /* UART user callback */
 void UART_UserCallback(UART_Type *base, uart_handle_t *handle, status_t status,
@@ -94,36 +101,36 @@ void UART_UserCallback(UART_Type *base, uart_handle_t *handle, status_t status,
 }
 
 void Uart_putChar(uart_struct* UART_struct, uint8_t data) {
-    uint8_t data1[1] = {data   };
     static uart_transfer_t receiveXfer_function;
     receiveXfer_function.dataSize = 1;
-    receiveXfer_function.data = data1;
+    receiveXfer_function.data = &data;
     UART_TransferSendNonBlocking(UART_struct->base, UART_struct->handle,
                                  &receiveXfer_function);
     xEventGroupWaitBits(*UART_struct->g_UART_Events_personal, txOnOffGoing,
-    pdTRUE, pdTRUE, portMAX_DELAY);
+    pdTRUE,
+                        pdTRUE,
+                        portMAX_DELAY);
 }
 
 void uart_send_task(void* args) {
 
     uart_struct* UART_struct = (uart_struct*) args;
-    vTaskDelay(pdMS_TO_TICKS(100));
+
+    static uart_transfer_t *receiveXfer_function;
     while (1)
     {
         /*
          * Cuando otra tarea envia un dato por medio de esta Queue, se envía a la UART
          */
 
-
-
-        volatile uart_transfer_t *receiveXfer_function;
         xQueueReceive(*UART_struct->UART_send_Queue, &receiveXfer_function,
                       portMAX_DELAY);
+
         while (*receiveXfer_function->data)
         {
             Uart_putChar(UART_struct, *receiveXfer_function->data++);
         }
-        vPortFree(receiveXfer_function);
+
     }
 }
 
@@ -131,13 +138,13 @@ void uart_receive_task(void* args) {
     uart_struct* UART_struct = (uart_struct*) args;
 
     static uint8_t g_rxBuffer[ECHO_BUFFER_LENGTH] = { 0 };
+    uart_transfer_t *sendXfer_function;
     uart_transfer_t receiveXfer;
 
 
     while (1)
     {
 
-        volatile uart_transfer_t *sendXfer_function;
         sendXfer_function = pvPortMalloc(sizeof(uart_transfer_t*));
         receiveXfer.data = g_rxBuffer;
         receiveXfer.dataSize = ECHO_BUFFER_LENGTH;
@@ -161,27 +168,26 @@ void uart_receive_task(void* args) {
     }
 }
 
-
 void UART_tasks(void*args) {
     uart_struct* UART_struct = (uart_struct*) (args);
     *UART_struct->g_UART_Events_personal = xEventGroupCreate();
 
-    xTaskCreate(uart_send_task, "send_uart", configMINIMAL_STACK_SIZE ,
+    xTaskCreate(uart_send_task, "send_uart", configMINIMAL_STACK_SIZE + 100,
                 UART_struct, 2, NULL);
     xTaskCreate(uart_receive_task, "receive_uart",
-    configMINIMAL_STACK_SIZE  ,
+    configMINIMAL_STACK_SIZE + 100,
                 UART_struct, 2, NULL);
 
-    *UART_struct->UART_receive_Queue = xQueueCreate(1, sizeof(uart_transfer_t*));
+    *UART_struct->UART_receive_Queue = xQueueCreate(1,
+                                                    sizeof(uart_transfer_t*));
     *UART_struct->UART_send_Queue = xQueueCreate(1, sizeof(uart_transfer_t*));
 }
-
 
 void SYSconfig_UARTConfiguration(uart_struct *UART_struct) {
 
     uart_config_t config;
     UART_GetDefaultConfig(&config);
-    port_pin_config_t uart1_configuration = { kPORT_PullDisable,
+    port_pin_config_t uart1_configuration = { kPORT_PullDown,
                   kPORT_SlowSlewRate, kPORT_PassiveFilterEnable, kPORT_OpenDrainDisable,
                   kPORT_LowDriveStrength, kPORT_MuxAlt3, kPORT_UnlockRegister };
 
@@ -200,15 +206,13 @@ void SYSconfig_UARTConfiguration(uart_struct *UART_struct) {
             NVIC_SetPriority(UART0_RX_TX_IRQn, 5);
             break;
         case UART_1:
+           PORT_SetPinConfig(PORTC, 3, &uart1_configuration);
+            PORT_SetPinConfig(PORTC, 4, &uart1_configuration);
 
-            CLOCK_EnableClock(kCLOCK_PortC);
-            CLOCK_EnableClock(kCLOCK_Uart1);
-            config.baudRate_Bps = 9600U;
-
+            config.baudRate_Bps = BOARD_DEBUG_UART_BAUDRATE;
             config.enableTx = true;
             config.enableRx = true;
-            PORT_SetPinConfig(PORTC, 3, &uart1_configuration);
-            PORT_SetPinConfig(PORTC, 4, &uart1_configuration);
+
             UART_Init(UART_struct->base, &config, CLOCK_GetFreq(UART0_CLK_SRC));
 
             UART_TransferCreateHandle(UART_struct->base, UART_struct->handle,
