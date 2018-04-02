@@ -467,31 +467,31 @@ uint16_t ASCII_TO_uint8_t(uint8_t fifo_number, uint8_t fifo_pops)
 //////////////////////////////////////////MENUS FUNCTIONS BODIES////////////////////////////////////////////
 void TerminalMenus_MainMenu(void* args)
 {
-    pI2C_write_queue = pGetI2CHandler();
-    pSPI_queue = pGetSPIHandler();
-    pI2C_done = pGetI2Mutex();
+    pI2C_write_queue = pGetI2CHandler();    /**obtain of the i2c queue*/
+    pSPI_queue = pGetSPIHandler();  /**obtain of the spi queue*/
+    pI2C_done = pGetI2Mutex();  /**obtain the status of the i2c mutex*/
 
-    uart_struct* UART_struct = (uart_struct*) args;
-    uint8_t firstEntryToMenu = pdFALSE;
-    uart_transfer_t* received_UART;
-    uint8_t charReceived = 0;
-    vTaskDelay(pdMS_TO_TICKS(500));
+    uart_struct* UART_struct = (uart_struct*) args; /**task input parameters copied locally*/
+    uint8_t firstEntryToMenu = pdFALSE; /**flag used to know if the task has already entered the execution*/
+    uart_transfer_t* received_UART; /**uart transfer variable used for the queues*/
+    uint8_t charReceived = 0; /**this variable holds the received char from the uart*/
+    vTaskDelay(pdMS_TO_TICKS(500)); /**gives a little bit of time by sleeping the task in order to have everything properly configured*/
     for (;;)
-    {
+    { /**task superloop*/
         if (pdFALSE == firstEntryToMenu)
-        {
-            xSemaphoreTake(Interface_mutex, portMAX_DELAY);
-            firstEntryToMenu = pdTRUE;
+        { /**if its the first time that the task enters the superloop then,*/
+            xSemaphoreTake(Interface_mutex, portMAX_DELAY); /**takes the mutex in order to protect the printing of the menu (especially the VT100 commands)*/
+            firstEntryToMenu = pdTRUE; /**sets the task entry point flag*/
             MenuPrinter(UART_struct, MainMenu); //TODO: identify which terminal is inside the function
-            xSemaphoreGive(Interface_mutex);
+            xSemaphoreGive(Interface_mutex); /**releases the previously taken mutex*/
         }
         xQueueReceive(*UART_struct->UART_receive_Queue, &received_UART,
-                      portMAX_DELAY);
-        charReceived = *received_UART->data;
+                      portMAX_DELAY); /**sleeps until a char is received from the uart*/
+        charReceived = *received_UART->data; /**the received char is stored*/
 
-        CreateMenuTask(UART_struct, charReceived - 0x30);
-        vPortFree(received_UART);
-        vTaskDelete(NULL);
+        CreateMenuTask(UART_struct, charReceived - 0x30); /**sends the char to the createmenutask function in order to create the new menu*/
+        vPortFree(received_UART); /**free the uart queue received*/
+        vTaskDelete(NULL); /**the menu task is deleted*/
     }
 }
 
