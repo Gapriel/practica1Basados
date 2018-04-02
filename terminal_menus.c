@@ -341,7 +341,7 @@ void CreateMenuTask(uart_struct* uart_struct, uint8_t menuToBeCreated) {
         case Terminal2Communication:
             xTaskCreate(TerminalMenus_TerminalsCommunication,
                         "terminals communication menu",
-                        configMINIMAL_STACK_SIZE+30,
+                        configMINIMAL_STACK_SIZE+50,
                         (void*) uart_struct, 3, NULL);
         break;
         case LCDEcho:
@@ -1286,12 +1286,81 @@ void TerminalMenus_TerminalsCommunication(void* args)
                                portMAX_DELAY);
                     vTaskDelay(pdMS_TO_TICKS(20)); /**gives time for the UART to properly print the string sent*/
                     vPortFree(received_UART); //the previously reserved memory used for the UART capture is liberated
-                }else{
+                }
+
+
+
+
+                if(RETURN == charReceived[0]){
+
+                    toSend_UART = pvPortMalloc(sizeof(uart_transfer_t*));
+                    toSend_UART->data = UART_struct->ChatStates->chatPosition;
+                    xQueueSend(*UART_struct->ChatStates->UART0_send_Queue,
+                               &toSend_UART, portMAX_DELAY);
+                    vTaskDelay(pdMS_TO_TICKS(20)); /**gives time for the UART to properly print the string sent*/
+                    toSend_UART = pvPortMalloc(sizeof(uart_transfer_t*));
+                    toSend_UART->data = UART_struct->ChatStates->chatPosition;
+                    xQueueSend(*UART_struct->ChatStates->UART1_send_Queue,
+                               &toSend_UART, portMAX_DELAY);
+                    vTaskDelay(pdMS_TO_TICKS(20)); /**gives time for the UART to properly print the string sent*/
+                    if ((UART_1 == UART_struct->uart_number) && pdTRUE  == (UART_struct->ChatStates->terminalChatStates[UART_0]))
+                    {
+                        uint8_t byebye[] = { "Terminal 2 se desconecto" };
+                        toSend_UART = pvPortMalloc(sizeof(uart_transfer_t*));
+                        toSend_UART->data = byebye;
+                        xQueueSend(*UART_struct->ChatStates->UART0_send_Queue,
+                                   &toSend_UART, portMAX_DELAY);
+                        vTaskDelay(pdMS_TO_TICKS(20)); /**gives time for the UART to properly print the string sent*/
+                    }else if((UART_0 == UART_struct->uart_number) && pdTRUE == (UART_struct->ChatStates->terminalChatStates[UART_1])){
+                        uint8_t byebye[] = { "Terminal 1 se desconecto" };
+                        toSend_UART = pvPortMalloc(sizeof(uart_transfer_t*));
+                        toSend_UART->data = byebye;
+                        xQueueSend(*UART_struct->ChatStates->UART1_send_Queue,
+                                   &toSend_UART, portMAX_DELAY);
+                        vTaskDelay(pdMS_TO_TICKS(20)); /**gives time for the UART to properly print the string sent*/
+                    }
+
+                    UART_struct->ChatStates->FirstEntry[UART_struct->uart_number] =
+                            pdFALSE;
+                    UART_struct->ChatStates->chatPosition[0] = '\033';
+                    UART_struct->ChatStates->chatPosition[1] = '[';
+                    UART_struct->ChatStates->chatPosition[2] = '1';
+                    UART_struct->ChatStates->chatPosition[3] = '2';
+                    UART_struct->ChatStates->chatPosition[4] = ';';
+                    UART_struct->ChatStates->chatPosition[5] = '1';
+                    UART_struct->ChatStates->chatPosition[6] = '0';
+                    UART_struct->ChatStates->chatPosition[7] = 'H';
+                    UART_struct->ChatStates->chatPosition[8] = '\0';
+                    UART_struct->ChatStates->terminalChatStates[UART_struct->uart_number] =
+                            pdFALSE;
+                    UART_struct->ChatStates->localPosition[UART_struct->uart_number].localPrint[0] =
+                            '\033';
+                    UART_struct->ChatStates->localPosition[UART_struct->uart_number].localPrint[1] =
+                            '[';
+                    UART_struct->ChatStates->localPosition[UART_struct->uart_number].localPrint[2] =
+                            '0';
+                    UART_struct->ChatStates->localPosition[UART_struct->uart_number].localPrint[3] =
+                            '5';
+                    UART_struct->ChatStates->localPosition[UART_struct->uart_number].localPrint[4] =
+                            ';';
+                    UART_struct->ChatStates->localPosition[UART_struct->uart_number].localPrint[5] =
+                            '1';
+                    UART_struct->ChatStates->localPosition[UART_struct->uart_number].localPrint[6] =
+                            '0';
+                    UART_struct->ChatStates->localPosition[UART_struct->uart_number].localPrint[7] =
+                            'H';
+                    UART_struct->ChatStates->localPosition[UART_struct->uart_number].localPrint[8] =
+                            '\0';
                     vPortFree(received_UART); //the previously reserved memory used for the UART capture is liberated
                     CheckIfReturnToMenu(UART_struct, charReceived[0], 2);
                 }
 
-                if(ENTER == charReceived[0]){
+
+
+
+
+                if(ENTER == charReceived[0])
+                {
                     toSend_UART = pvPortMalloc(sizeof(uart_transfer_t*));
                     toSend_UART->data =
                             UART_struct->ChatStates->chatPosition;
@@ -1418,33 +1487,6 @@ void TerminalMenus_TerminalsCommunication(void* args)
                 charReceived[0] = *received_UART->data;
                 if (RETURN == charReceived[0])
                 {
-                    toSend_UART = pvPortMalloc(sizeof(uart_transfer_t*));
-                    toSend_UART->data = UART_struct->ChatStates->chatPosition;
-                    xQueueSend(*UART_struct->ChatStates->UART0_send_Queue,
-                               &toSend_UART, portMAX_DELAY);
-                    vTaskDelay(pdMS_TO_TICKS(20)); /**gives time for the UART to properly print the string sent*/
-                    toSend_UART = pvPortMalloc(sizeof(uart_transfer_t*));
-                    toSend_UART->data = UART_struct->ChatStates->chatPosition;
-                    xQueueSend(*UART_struct->ChatStates->UART1_send_Queue,
-                               &toSend_UART, portMAX_DELAY);
-                    vTaskDelay(pdMS_TO_TICKS(20)); /**gives time for the UART to properly print the string sent*/
-
-                    if((UART_1 == UART_struct->uart_number) && pdTRUE == (UART_struct->ChatStates->terminalChatStates[UART_0])){
-                        uint8_t byebye[] = {"Terminal 1 se desconecto"};
-                        toSend_UART = pvPortMalloc(sizeof(uart_transfer_t*));
-                        toSend_UART->data = byebye;
-                        xQueueSend(*UART_struct->ChatStates->UART0_send_Queue, &toSend_UART,
-                                   portMAX_DELAY);
-                        vTaskDelay(pdMS_TO_TICKS(20)); /**gives time for the UART to properly print the string sent*/
-                    }else if((UART_0 == UART_struct->uart_number) && pdTRUE == (UART_struct->ChatStates->terminalChatStates[UART_1])){
-                        uint8_t byebye[] = { "Terminal 2 se desconecto" };
-                        toSend_UART = pvPortMalloc(sizeof(uart_transfer_t*));
-                        toSend_UART->data = byebye;
-                        xQueueSend(*UART_struct->ChatStates->UART0_send_Queue,
-                                   &toSend_UART, portMAX_DELAY);
-                        vTaskDelay(pdMS_TO_TICKS(20)); /**gives time for the UART to properly print the string sent*/
-                    }
-
                     UART_struct->ChatStates->FirstEntry[UART_struct->uart_number] = pdFALSE;
                     UART_struct->ChatStates->chatPosition[0] = '\033';
                     UART_struct->ChatStates->chatPosition[1] = '[';
