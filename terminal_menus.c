@@ -1663,17 +1663,17 @@ void SPIReadHour(void * args)
     uint8_t printing_time_chars[9] = { '0' }; /**array that will hould the hour/date info to be printed on the spi screen*/
     SPI_msg_t *timeString; /**where the printing time chars will be concatenated for posterior sending*/
     i2c_master_transfer_t *masterXfer_I2C_write; /**master transfer variable used for I2C transfers*/
-    void * tempPointer;
-    uint8_t index;
-    uint16_t subaddress = 0x02; /***/
-    vTaskDelay(pdMS_TO_TICKS(1000));
+    uint8_t index; /**index variable used for the for loop*/
+    vTaskDelay(pdMS_TO_TICKS(1000)); /**1s the task is sent to sleep in order to assure previous correct modules initialization*/
     for (;;)
-    {
-        xLastWakeTime = xTaskGetTickCount();
+    { /**task superloop*/
+        xLastWakeTime = xTaskGetTickCount(); /**gets the passed ticks*/
 
-        uint16_t subaddress = 0x02;
+        uint16_t subaddress = 0x02; /**the starting subaddress is set to 0x02 as it is the seconds register*/
         for (index = 0; index < 3; index++)
         {
+            /**master transfer configuration, memory reservation, mastertransfer is sent to the I2C with
+                                                        * its queue, and the subaddress is increased by one*/
             masterXfer_I2C_write = pvPortMalloc(sizeof(i2c_master_transfer_t*));
             masterXfer_I2C_write->data = &time_buffer_variable[index];
             masterXfer_I2C_write->dataSize = 1;
@@ -1688,6 +1688,8 @@ void SPIReadHour(void * args)
             vTaskDelay(pdMS_TO_TICKS(100));
             subaddress++;
         }
+
+        /**after reading the registers, the hour is properly interpreted and stored, and also converted to ascii*/
         printing_time_chars[0] = ((time_buffer_variable[2] & TensMask) >> 4)
                 + '0'; /**hours tens*/
         printing_time_chars[1] = (time_buffer_variable[2] & UnitsMask) + '0';
@@ -1703,6 +1705,7 @@ void SPIReadHour(void * args)
                 + '0';
         printing_time_chars[8] = '\0';
 
+        /**hour message zone indicating message is sent to the SPI screen*/
         uint8_t HourString[12] = { "Hour:       " };
         timeString = pvPortMalloc(sizeof(SPI_msg_t*));
         timeString->LCD_to_be_clear = pdFALSE;
@@ -1710,12 +1713,14 @@ void SPIReadHour(void * args)
         xQueueSend(*pSPI_queue, &timeString, portMAX_DELAY);
         vTaskDelay(pdMS_TO_TICKS(100));
 
+        /**hour string is sent to the SPI screen*/
         timeString = pvPortMalloc(sizeof(SPI_msg_t*));
         timeString->LCD_to_be_clear = pdFALSE;
         timeString->string = printing_time_chars;
         xQueueSend(*pSPI_queue, &timeString, portMAX_DELAY);
         vTaskDelay(pdMS_TO_TICKS(100));
 
+        /**spacing string is sent to the SPI screen*/
         uint8_t SpaceString[12] = { "            " };
         timeString = pvPortMalloc(sizeof(SPI_msg_t*));
         timeString->LCD_to_be_clear = pdFALSE;
@@ -1723,9 +1728,11 @@ void SPIReadHour(void * args)
         xQueueSend(*pSPI_queue, &timeString, portMAX_DELAY);
         vTaskDelay(pdMS_TO_TICKS(100));
 
-        subaddress = 0x05;
+        subaddress = 0x05; /**the starting subaddress is set to 0x02 as it is the days register*/
         for (index = 0; index < 3; index++)
         {
+            /**master transfer configuration, memory reservation, mastertransfer is sent to the I2C with
+                                                                    * its queue, and the subaddress is increased by one*/
             masterXfer_I2C_write = pvPortMalloc(sizeof(i2c_master_transfer_t*));
             masterXfer_I2C_write->data = &time_buffer_variable[index];
             masterXfer_I2C_write->dataSize = 1;
@@ -1741,6 +1748,7 @@ void SPIReadHour(void * args)
             subaddress++;
         }
 
+        /**after reading the registers, the date is properly interpreted and stored, and also converted to ascii*/
         printing_time_chars[0] = ((time_buffer_variable[0] & TensMask) >> 4)
                 + '0';
         printing_time_chars[1] = (time_buffer_variable[0] & UnitsMask) + '0';
@@ -1754,6 +1762,7 @@ void SPIReadHour(void * args)
                 + '0';
         printing_time_chars[8] = '\0';
 
+        /**date message zone indicating message is sent to the SPI screen*/
         uint8_t DateString[12] = { "Date:       " };
         timeString = pvPortMalloc(sizeof(SPI_msg_t*));
         timeString->LCD_to_be_clear = pdFALSE;
@@ -1761,19 +1770,20 @@ void SPIReadHour(void * args)
         xQueueSend(*pSPI_queue, &timeString, portMAX_DELAY);
         vTaskDelay(pdMS_TO_TICKS(100));
 
+        /**date string is sent to the SPI screen*/
         timeString = pvPortMalloc(sizeof(SPI_msg_t*));
         timeString->LCD_to_be_clear = pdFALSE;
         timeString->string = printing_time_chars;
         xQueueSend(*pSPI_queue, &timeString, portMAX_DELAY);
         vTaskDelay(pdMS_TO_TICKS(100));
 
+        /**spacing string is sent to the SPI screen*/
         timeString = pvPortMalloc(sizeof(SPI_msg_t*));
         timeString->LCD_to_be_clear = pdFALSE;
         timeString->string = SpaceString;
         xQueueSend(*pSPI_queue, &timeString, portMAX_DELAY);
         vTaskDelay(pdMS_TO_TICKS(100));
 
-        vTaskDelayUntil(&xLastWakeTime, xPeriod);
+        vTaskDelayUntil(&xLastWakeTime, xPeriod); /**the task is sent to sleep until the 1s period has transcurred*/
     }
 }
-
