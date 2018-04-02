@@ -117,11 +117,11 @@ void PORTA_IRQHandler() {
     InterruptFlags = GPIO_GetPinsInterruptFlags(GPIOA);
     if (PTA1 == (InterruptFlags & PTA1))
     {
-        xEventGroupSetBitsFromISR(UpdateValueByButtons_Events, MONTH_DOWN, pxHigherPriorityTaskWoken);
+        xEventGroupSetBitsFromISR(UpdateValueByButtons_Events, MONTH_DOWN, &pxHigherPriorityTaskWoken);
         GPIO_ClearPinsInterruptFlags(GPIOA, PTA1);
     } else if (PTA2 == (InterruptFlags & PTA2))
     {
-        xEventGroupSetBitsFromISR(UpdateValueByButtons_Events, DAY_DOWN, pxHigherPriorityTaskWoken);
+        xEventGroupSetBitsFromISR(UpdateValueByButtons_Events, DAY_DOWN, &pxHigherPriorityTaskWoken);
         GPIO_ClearPinsInterruptFlags(GPIOA, PTA2);
     }
     portYIELD_FROM_ISR(pxHigherPriorityTaskWoken);
@@ -133,13 +133,12 @@ void PORTB_IRQHandler() {
     InterruptFlags = GPIO_GetPinsInterruptFlags(GPIOB);
     if (PTB9 == (InterruptFlags & PTB9))
     {
-        xEventGroupSetBitsFromISR(UpdateValueByButtons_Events, MONTH_UP, pxHigherPriorityTaskWoken);
+        xEventGroupSetBitsFromISR(UpdateValueByButtons_Events, MONTH_UP, &pxHigherPriorityTaskWoken);
         GPIO_ClearPinsInterruptFlags(GPIOB, PTB9);
 
-        PRINTF("del B9");
     } else if (PTB23 == (InterruptFlags & PTB23))
     {
-        xEventGroupSetBitsFromISR(UpdateValueByButtons_Events, DAY_UP, pxHigherPriorityTaskWoken);
+        xEventGroupSetBitsFromISR(UpdateValueByButtons_Events, DAY_UP,&pxHigherPriorityTaskWoken);
 
         GPIO_ClearPinsInterruptFlags(GPIOB, PTB23);
     }
@@ -309,25 +308,25 @@ void CreateMenuTask(uart_struct* uart_struct, uint8_t menuToBeCreated)
     {
         case ReadMemoryI2C:
             xTaskCreate(TerminalMenus_ReadMemory, "Read Memory Menu",
-            configMINIMAL_STACK_SIZE,
+            configMINIMAL_STACK_SIZE + 20,
                         (void*) uart_struct, 3, NULL);
 
         break;
         case WriteMemoryI2C:
             xTaskCreate(TerminalMenus_WriteMemory, "Write memory menu",
-            configMINIMAL_STACK_SIZE + 20,
+            configMINIMAL_STACK_SIZE + 50,
                         (void*) uart_struct, 3, NULL);
 
         break;
         case StablishHour:
             xTaskCreate(TerminalMenus_EstablishRTCHour, "Establish hour menu",
-            configMINIMAL_STACK_SIZE,
+            configMINIMAL_STACK_SIZE + 20,
                         (void*) uart_struct, 3, NULL);
 
         break;
         case StablishDate:
             xTaskCreate(TerminalMenus_EstablishRTCDate, "Establish date menu",
-            configMINIMAL_STACK_SIZE,
+            configMINIMAL_STACK_SIZE + 20,
                         (void*) uart_struct, 3, NULL);
 
         break;
@@ -338,12 +337,12 @@ void CreateMenuTask(uart_struct* uart_struct, uint8_t menuToBeCreated)
         break;
         case ReadHour:
             xTaskCreate(TerminalMenus_ReadRTCHour, "Read hour menu",
-            configMINIMAL_STACK_SIZE,
+            configMINIMAL_STACK_SIZE + 20,
                         (void*) uart_struct, 3, NULL);
         break;
         case ReadDate:
             xTaskCreate(TerminalMenus_ReadRTCDate, "read date menu",
-            configMINIMAL_STACK_SIZE,
+            configMINIMAL_STACK_SIZE + 10,
                         (void*) uart_struct, 3, NULL);
         break;
         case Terminal2Communication:
@@ -929,7 +928,7 @@ void TerminalMenus_ReadRTCHour(void* args) {
     pdFALSE, { pdTRUE, pdTRUE, pdTRUE }, { { { "\033[11;10H" } } }, //struct with constant position reference used in memory read menu
         { 0, 0 } };
     volatile uart_transfer_t* received_UART = NULL;
-
+    UpdateValueByButtons_Events = xEventGroupCreate();
     for (;;)
     {
 
@@ -979,26 +978,74 @@ void TerminalMenus_ReadRTCHour(void* args) {
                 vTaskDelay(pdMS_TO_TICKS(100));
                 subaddress++;
             }
-            uint8_t EventValues =xEventGroupGetBits( UpdateValueByButtons_Events);
-            switch (EventValues){
-                case 0:
-                    break;
-                case HOURS_UP:
-                    time_buffer_variable[2] +=1;
-                    break;
-                case HOURS_DOWN:
-                    time_buffer_variable[2] -=1;
-                    break;
-                case MINUTES_UP:
-                    time_buffer_variable[1] +=1;
-                    break;
-                case MINUTES_DOWN:
-                    time_buffer_variable[1] -=1;
-                    break;
+            #if 1
+			uint8_t EventValues =xEventGroupGetBits( UpdateValueByButtons_Events);
+            if(0 != EventValues){
+
+                uint8_t hours = ((time_buffer_variable[2] >> 4) & 0x03)*10 + (time_buffer_variable[2] & 0xF) ;
+                uint8_t minutes = (time_buffer_variable[1] >> 4)*10 + (time_buffer_variable[1] &0xF);
+
+    			switch (EventValues){
+                    case 0:
+                        break;
+                    case HOURS_UP:
+                    	hours = (hours < 23) ? (hours + 1): 0;
+                        break;
+                    case HOURS_DOWN:
+                    	hours =(hours > 0) ? (hours - 1): 23;
+                        break;
+                    case MINUTES_UP:
+                    	minutes = (minutes < 59) ? (minutes + 1): 0;
+                        break;
+                    case MINUTES_DOWN:
+                    	minutes =(minutes > 0) ? (minutes - 1): 59;
+                        break;
+                }
+    			time_buffer_variable[2] = ( (hours/10)<< 4) + ((hours - (hours/10)*10));
+    			time_buffer_variable[1] = ( (minutes/10)<< 4) + ((minutes - (minutes/10)*10));
+
+    			i2c_master_transfer_t* masterXfer_changed_hours;
+    			masterXfer_changed_hours = pvPortMalloc(sizeof(i2c_master_transfer_t*));
+    			uint32_t minutes_subaddres = 0x03;
+                masterXfer_changed_hours->data = &(time_buffer_variable[1]);
+                masterXfer_changed_hours->dataSize = 1;
+                masterXfer_changed_hours->direction = kI2C_Write;
+                masterXfer_changed_hours->flags = kI2C_TransferDefaultFlag;
+                masterXfer_changed_hours->slaveAddress = 0x50;
+                masterXfer_changed_hours->subaddress = (uint32_t) minutes_subaddres;
+                masterXfer_changed_hours->subaddressSize = 1;
+
+                vTaskDelay(pdMS_TO_TICKS(50));
+                xQueueSend(*pI2C_write_queue, &masterXfer_changed_hours, portMAX_DELAY);
+                xSemaphoreTake(*pI2C_done, portMAX_DELAY);
+                xSemaphoreGive(*pI2C_done);
+
+
+            	masterXfer_changed_hours = pvPortMalloc(sizeof(i2c_master_transfer_t*));
+            	uint32_t hours_subaddress = 0x04;
+            	masterXfer_changed_hours->data = &(time_buffer_variable[2]);
+            	masterXfer_changed_hours->dataSize = 1;
+            	masterXfer_changed_hours->direction = kI2C_Write;
+            	masterXfer_changed_hours->flags = kI2C_TransferDefaultFlag;
+            	masterXfer_changed_hours->slaveAddress = 0x50;
+            	masterXfer_changed_hours->subaddress = (uint32_t) hours_subaddress;
+            	masterXfer_changed_hours->subaddressSize = 1;
+
+            	vTaskDelay(pdMS_TO_TICKS(50));
+            	xQueueSend(*pI2C_write_queue, &masterXfer_changed_hours, portMAX_DELAY);
+            	xSemaphoreTake(*pI2C_done, portMAX_DELAY);
+            	xSemaphoreGive(*pI2C_done);
+
+
+
+
             }
 
-            xEventGroupClearBits(UpdateValueByButtons_Events, HOURS_UP|HOURS_DOWN|MINUTES_UP|MINUTES_DOWN);
 
+
+
+            xEventGroupClearBits(UpdateValueByButtons_Events, HOURS_UP|HOURS_DOWN|MINUTES_UP|MINUTES_DOWN);
+#endif
             printing_time_chars[0] = ((time_buffer_variable[2] & TensMask) >> 4)
                     + '0'; /**hours tens*/
             printing_time_chars[1] = (time_buffer_variable[2] & UnitsMask)
