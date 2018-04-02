@@ -1608,49 +1608,52 @@ void TerminalMenus_TerminalsCommunication(void* args)
 void TerminalMenus_LCDEcho(void* args)
 {
 
-    uart_struct* UART_struct = (uart_struct*) args;
-    SPI_msg_t *charToBeMirrored;
-    uint8_t firstEntryToMenu = pdFALSE;
-    uart_transfer_t* received_UART;
-    uint8_t charReceived = 0;
+    uart_struct* UART_struct = (uart_struct*) args; /**local copy of the received uart struct passed by reference*/
+    SPI_msg_t *charToBeMirrored; /**spi message declared to be sent to the SPI screen*/
+    uint8_t firstEntryToMenu = pdFALSE; /**flag used to know if its the first time that the current task enters the superloop*/
+    uart_transfer_t* received_UART; /**a uart reception variable is used to receive data from the local uart*/
+    uint8_t charReceived = 0; /**received char variable defined*/
     LineMovementPack_t LineMover = { 0, 0, 1,
     pdFALSE, { pdFALSE, pdTRUE, pdTRUE }, { { { "\033[14;10H" } } }, //struct with constant position reference used in memory read menu
-        { 10000, 0 } };
+        { 10000, 0 } }; /**structure which holds the information for the check if line movement function and the character validator function*/
     for (;;)
-    {
+    { /**practica superloop*/
         /**The task checks if it's the first time in the task, so that the menu is printed*/
         if (pdFALSE == firstEntryToMenu)
-        {
-            xSemaphoreTake(Interface_mutex, portMAX_DELAY);
-            firstEntryToMenu = pdTRUE;
-            MenuPrinter(UART_struct, LCDEcho); //TODO: identify which terminal is inside the function
-            xSemaphoreGive(Interface_mutex);
+        { /**if its the first time the task enters the superloop*/
+            xSemaphoreTake(Interface_mutex, portMAX_DELAY); /**takes a semaphore for protecting the uart menu printing sequence*/
+            firstEntryToMenu = pdTRUE; /**the first entry variable is set*/
+            MenuPrinter(UART_struct, LCDEcho); /**the LCD ECHO menu is printed in the current terminal*/
+            xSemaphoreGive(Interface_mutex); /**releases the previosuly taken semaphore as the current menu has been succesfully printed*/
         }
         xQueueReceive(*UART_struct->UART_receive_Queue, &received_UART,
-                      portMAX_DELAY);
-        charReceived = *received_UART->data;
-        vPortFree(received_UART);
+                      portMAX_DELAY); /**the task is sent to sleep until a char is received from the uart*/
+        charReceived = *received_UART->data; /*the received char is pulled from the received queue of the uart */
+        vPortFree(received_UART); /**now that the character is stored, the upcoming message from the uart is liberated*/
 
         if (RETURN == charReceived)
-        {
-            charToBeMirrored = pvPortMalloc(sizeof(SPI_msg_t*));
-            charToBeMirrored->LCD_to_be_clear = pdTRUE;
-            xQueueSend(*pSPI_queue, &charToBeMirrored, portMAX_DELAY);
+        { /**if the received char is a return to menu*/
+            charToBeMirrored = pvPortMalloc(sizeof(SPI_msg_t*)); /**memory is reserved for the uart executable*/
+            charToBeMirrored->LCD_to_be_clear = pdTRUE; /**the spi screen is ereased*/
+            xQueueSend(*pSPI_queue, &charToBeMirrored, portMAX_DELAY); /**the received char is sent to the current spi queue*/
             CheckIfLineMovementAndUartEcho(UART_struct, charReceived,
-                                                       &LineMover);
-            CheckIfReturnToMenu(UART_struct, charReceived, SPI_TASK);
+                                                       &LineMover);/**the check if line movement function is called */
+            CheckIfReturnToMenu(UART_struct, charReceived, SPI_TASK); /**the check if return to menu function is called, and so the menu task is changed*/
         } else if (ENTER != charReceived)
-        {
+        { /**if the character is anything different from enter and return chars,*/
             CharacterValidator(&LineMover, LCDEcho, charReceived);
             CheckIfLineMovementAndUartEcho(UART_struct, charReceived,
                                            &LineMover);
-            charToBeMirrored = pvPortMalloc(sizeof(SPI_msg_t*));
-            charToBeMirrored->LCD_to_be_clear = pdFALSE;
+            charToBeMirrored = pvPortMalloc(sizeof(SPI_msg_t*)); /**memory is reserved for the spi message to me snet,*/
+            charToBeMirrored->LCD_to_be_clear = pdFALSE; /**the spi screen doesnt need screen cleaning*/
+
+            /**copy of the received char into a buffer*/
             uint8_t stringBuffer[2];
             stringBuffer[0] = charReceived;
             stringBuffer[1] = '\0';
-            charToBeMirrored->string = stringBuffer;
-            xQueueSend(*pSPI_queue, &charToBeMirrored, portMAX_DELAY);
+
+            charToBeMirrored->string = stringBuffer; /**the data to be sent will be the received char string*/
+            xQueueSend(*pSPI_queue, &charToBeMirrored, portMAX_DELAY); /**data is sent to the spi for it to print*/
         }
     }
 }
