@@ -48,18 +48,16 @@ typedef enum {
 
 //////////////////**function prototypes*////////////////////////////
 void SYSconfig_ButtonsConfiguration();
+
 void SYSconfig_SPIConfiguration();
+
 void SYSconfig_UARTConfiguration();
+
 void SYSconfig_I2CConfiguration();
 
-
-
-
-
-
-
-
 //////////////////**mechanisms definitions*/////////////////////////
+
+
 void SystemConfiguration(void* args) {
     for (;;)
     {
@@ -69,15 +67,21 @@ void SystemConfiguration(void* args) {
         CLOCK_EnableClock(kCLOCK_PortB);
         CLOCK_EnableClock(kCLOCK_PortC);
         /**modules configuration*/
+        /* Gets the references of the Interface mutex for the UARTS and the subtaks events from the terminal menus.*/
         pInterface_mutex = (SemaphoreHandle_t*) pGetInterfaceMutex();
         pSubTasks_Events = (EventGroupHandle_t*) pGetSubTasksEvents();
+
+        /* Initialize the Interface menu mutex and the Events for the SubTaks*/
         *pSubTasks_Events = xEventGroupCreate();
         *pInterface_mutex = xSemaphoreCreateMutex();
         SYSconfig_ButtonsConfiguration(); /**buttons configuration*/
         SYSconfig_SPIConfiguration(); /**SPI module configuration (including device initialization)*/
         SYSconfig_I2CConfiguration(); /**I2C module configuration*/
+
+        /* Sets the FREE MEMORY AND FREE RTC Events*/
        xEventGroupSetBits(*pSubTasks_Events, FREE_MEM_EVENT|FREE_RTC_EVENT);
 
+       /*Because it's just for comfiguration*/
        vTaskDelete(NULL);
     }
 }
