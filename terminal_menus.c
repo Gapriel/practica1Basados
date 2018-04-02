@@ -47,6 +47,16 @@
 #define I2C_data_ready (1 << 1)
 
 
+EventGroupHandle_t UpdateValueByButtons_Events;
+#define DAY_UP (1 << 0)
+#define DAY_DOWN (1 << 1)
+#define MONTH_UP (1 << 2)
+#define MONTH_DOWN (1 << 3)
+#define MINUTES_UP (1 << 0)
+#define MINUTES_DOWN (1 << 1)
+#define HOURS_UP (1 << 2)
+#define HOURS_DOWN (1 << 3)
+
 #define STRING_SIZE 77
 
 typedef enum {
@@ -84,13 +94,6 @@ typedef struct {
 
 
 
-void I2C_restart(TimerHandle_t handler) {
-    pI2C_events = pGetI2CEvents();
-    xEventGroupSetBits(*pI2C_events, I2C_free);
-    xSemaphoreGive(*pI2C_done);
-
-
-}
 
 EventGroupHandle_t* pGetSubTasksEvents() {
     return &SubTasks_Events;
@@ -103,43 +106,38 @@ SemaphoreHandle_t* pGetInterfaceMutex() {
 void PORTA_IRQHandler() {
     uint32_t InterruptFlags;
 
+    BaseType_t pxHigherPriorityTaskWoken;
     InterruptFlags = GPIO_GetPinsInterruptFlags(GPIOA);
     if (PTA1 == (InterruptFlags & PTA1))
     {
-
+        xEventGroupSetBitsFromISR(UpdateValueByButtons_Events, MONTH_DOWN, pxHigherPriorityTaskWoken);
         GPIO_ClearPinsInterruptFlags(GPIOA, PTA1);
-        /*
-         * prueba
-         */
-        PRINTF("del A1");
     } else if (PTA2 == (InterruptFlags & PTA2))
     {
-        PRINTF("MAS del A2");
-
+        xEventGroupSetBitsFromISR(UpdateValueByButtons_Events, DAY_DOWN, pxHigherPriorityTaskWoken);
         GPIO_ClearPinsInterruptFlags(GPIOA, PTA2);
     }
-
+    portYIELD_FROM_ISR(pxHigherPriorityTaskWoken);
 }
 
 void PORTB_IRQHandler() {
     uint32_t InterruptFlags;
-
+    BaseType_t pxHigherPriorityTaskWoken;
     InterruptFlags = GPIO_GetPinsInterruptFlags(GPIOB);
     if (PTB9 == (InterruptFlags & PTB9))
     {
-
+        xEventGroupSetBitsFromISR(UpdateValueByButtons_Events, MONTH_UP, pxHigherPriorityTaskWoken);
         GPIO_ClearPinsInterruptFlags(GPIOB, PTB9);
-        /*
-         * prueba
-         */
+
         PRINTF("del B9");
     } else if (PTB23 == (InterruptFlags & PTB23))
     {
-        PRINTF("MAS del B23");
+        xEventGroupSetBitsFromISR(UpdateValueByButtons_Events, DAY_UP, pxHigherPriorityTaskWoken);
 
         GPIO_ClearPinsInterruptFlags(GPIOB, PTB23);
     }
 
+    portYIELD_FROM_ISR(pxHigherPriorityTaskWoken);
 }
 
 //quoting: Gonzalez, E., Santamaria, G. ; DSP's 2017
@@ -962,6 +960,26 @@ void TerminalMenus_ReadRTCHour(void* args) {
                 vTaskDelay(pdMS_TO_TICKS(100));
                 subaddress++;
             }
+            uint8_t EventValues =xEventGroupGetBits( UpdateValueByButtons_Events);
+            switch (EventValues){
+                case 0:
+                    break;
+                case HOURS_UP:
+                    time_buffer_variable[2] +=1;
+                    break;
+                case HOURS_DOWN:
+                    time_buffer_variable[2] -=1;
+                    break;
+                case MINUTES_UP:
+                    time_buffer_variable[1] +=1;
+                    break;
+                case HOURS_UP:
+                    time_buffer_variable[1] -=1;
+                    break;
+            }
+
+            xEventGroupClearBits(UpdateValueByButtons_Events, HOURS_UP|HOURS_DOWN|MINUTES_UP|MINUTES_DOWN);
+
             printing_time_chars[0] = ((time_buffer_variable[2] & TensMask) >> 4)
                     + '0'; /**hours tens*/
             printing_time_chars[1] = (time_buffer_variable[2] & UnitsMask)
@@ -1011,6 +1029,7 @@ void TerminalMenus_ReadRTCHour(void* args) {
                         >> 4) + '0'; /**hours tens*/
                 printing_time_chars[1] = (time_buffer_variable[2] & UnitsMask)
                         + '0';
+
             }
 
             uart_transfer_t* toSend_UART;
@@ -1153,6 +1172,7 @@ void TerminalMenus_ReadRTCDate(void* args) {
 
 void TerminalMenus_TerminalsCommunication(void* args)
 {
+    FIFO_clearFIFOs();
     uart_struct* UART_struct = (uart_struct*) args;
     uint8_t firstEntryToMenu = pdFALSE;
     uart_transfer_t* received_UART;
@@ -1691,3 +1711,9 @@ void SPIReadHour(void * args) {
     }
 }
 
+
+void I2C_restart(TimerHandle_t handler) {
+    pI2C_events = pGetI2CEvents();
+    xEventGroupSetBits(*pI2C_events, I2C_free);
+    xSemaphoreGive(*pI2C_done);
+}

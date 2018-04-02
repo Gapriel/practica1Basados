@@ -39,6 +39,17 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+
+
+/*
+ * SPI_driver.h
+ *
+ *  Created on: Mar 10, 2018
+ *      Author: Avelar Díaz José Francisco      ie704217@iteso.mx
+ *      Author: Santamaría García Gabriel       ie699356@iteso.mx
+ */
+
+
 #include "board.h"
 #include "fsl_uart.h"
 
@@ -50,18 +61,10 @@
 #include "event_groups.h"
 
 #include "fsl_debug_console.h"
-/*******************************************************************************
- * Definitions
- ******************************************************************************/
-/* UART instance and clock */
-#define DEMO_UART UART0
-#define DEMO_UART_CLKSRC UART0_CLK_SRC
-#define DEMO_UART_CLK_FREQ CLOCK_GetFreq(UART0_CLK_SRC)
-#define ECHO_BUFFER_LENGTH 1
-#define txOnOffGoing (1 << 0)
-#define rxOnOffGoing (1 << 1)
-#define send_event (1 << 2)
 
+
+
+//////////////////**user types definitions*////////////////////////////
 
 typedef enum {UART_0,UART_1,UART_2}UART_NUMBER;
 
@@ -76,8 +79,8 @@ typedef struct{
     }localPosition[2];
 }chatStates_t;
 
-typedef struct{
 
+typedef struct{
     UART_Type *base;
     uart_handle_t* handle;
     EventGroupHandle_t* g_UART_Events_personal;
@@ -87,25 +90,56 @@ typedef struct{
     chatStates_t * ChatStates;
 }uart_struct;
 
-/*
- * Tarea encargada de enviar datos a la UART
- */
+
+
+
+
+/********************************************************************************************/
+/********************************************************************************************/
+/********************************************************************************************/
+/*!
+ *   \brief  Task to Send data to the UART
+ *   \param[in] void* casted void pointer of the uart structure
+*    \return void
+*/
 void uart_send_task(void*) ;
 
 /*
  * Tarea encargada de recibir datos de la UART
  */
 
+
+/********************************************************************************************/
+/********************************************************************************************/
+/********************************************************************************************/
+/*!
+ *   \brief  Task to receive data to the UART
+ *   \param[in] void* casted void pointer of the uart structure
+*    \return void
+*/
 void uart_receive_task(void*) ;
 
-/*
- * Funcion de inicializacion de la UART
- */
+/********************************************************************************************/
+/********************************************************************************************/
+/********************************************************************************************/
+/*!
+ *   \brief  Function to initialize UART tasks
+ *   \param[in] void* casted void pointer of the uart structure
+*    \return void
+*/
 void UART_tasks(void*) ;
 
 
 
 
+/********************************************************************************************/
+/********************************************************************************************/
+/********************************************************************************************/
+/*!
+ *   \brief  Function to configure a UART
+ *   \param[in] uart_struct* a pointer with the handlers and base of the uart to config.
+*    \return void
+*/
 void SYSconfig_UARTConfiguration(uart_struct *UART_struct) ;
 
 #endif /* UART_PERSONAL_H_ */
