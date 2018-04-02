@@ -217,36 +217,35 @@ static TerminalMenuType_t Menus[MENUS_QUANTITY] = { //menus strings to be displa
 /////////////////////////////////////////MECHANISMS DEFINITIONS/////////////////////////////////////////////
 void MenuPrinter(uart_struct* uart_struct, uint8_t menuToBePrinted)
 {
-
-    uart_transfer_t* toSend_UART;
-    uint8_t printedStringIndex = 0;
+    uart_transfer_t* toSend_UART; /**uart queue pointer declared*/
+    uint8_t printedStringIndex = 0; /**index used to know which string has been printed*/
     uint8_t screen_erease[] = { "\033[2J" }; /**VT100 terminal clear screen command*/
-    toSend_UART = pvPortMalloc(sizeof(uart_transfer_t*));
-    toSend_UART->data = screen_erease;
-    toSend_UART->dataSize = 1;
+    toSend_UART = pvPortMalloc(sizeof(uart_transfer_t*)); /**memory reservation for the uart send queue*/
+    toSend_UART->data = screen_erease; /**the data to be sent will be the screen erase command*/
+    toSend_UART->dataSize = 1; /**the data size of the uart transmission is specified to be of 1*/
 
     xQueueSend(*uart_struct->UART_send_Queue, &toSend_UART, portMAX_DELAY); /**sends content through the UART queue to be printed in the terminal*/
 
     vTaskDelay(pdMS_TO_TICKS(20)); /**gives time for the UART to properly print the string sent*/
     while (Menus[menuToBePrinted].Strings_quantity > printedStringIndex)
-    {
-        toSend_UART = pvPortMalloc(sizeof(uart_transfer_t*));
+    { /**while there is still any string to be printed then,*/
+        toSend_UART = pvPortMalloc(sizeof(uart_transfer_t*)); /**memory reservation for the uart send queue*/
         toSend_UART->data =
-                Menus[menuToBePrinted].Strings[printedStringIndex].positionXYCommand;
-        toSend_UART->dataSize = 1;
+                Menus[menuToBePrinted].Strings[printedStringIndex].positionXYCommand; /**the data to be sent will be the terminal position VT100 command to print the string*/
+        toSend_UART->dataSize = 1; /**the data size of the uart transmission is specified to be of 1*/
 
         xQueueSend(*uart_struct->UART_send_Queue, &toSend_UART, portMAX_DELAY); /**sends content through the UART queue to be printed in the terminal*/
 
         vTaskDelay(pdMS_TO_TICKS(20)); /**gives time for the UART to properly print the string sent*/
-        toSend_UART = pvPortMalloc(sizeof(uart_transfer_t*));
+        toSend_UART = pvPortMalloc(sizeof(uart_transfer_t*)); /**memory reservation for the uart send queue*/
         toSend_UART->data =
-                Menus[menuToBePrinted].Strings[printedStringIndex].String;
-        toSend_UART->dataSize = 1;
+                Menus[menuToBePrinted].Strings[printedStringIndex].String; /**the data to be printed will be the strings that compound the corresponding menu*/
+        toSend_UART->dataSize = 1; /**the data size of the uart transmission is specified to be of 1*/
 
         xQueueSend(*uart_struct->UART_send_Queue, &toSend_UART, portMAX_DELAY); /**sends content through the UART queue to be printed in the terminal*/
 
         vTaskDelay(pdMS_TO_TICKS(20)); /**gives time for the UART to properly print the string sent*/
-        printedStringIndex++;
+        printedStringIndex++; /**printed screen index increased by one*/
     }
 }
 
