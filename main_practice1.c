@@ -189,16 +189,15 @@ int main(void) {
 
 
     xTaskCreate(SystemConfiguration, "CONFIG",configMINIMAL_STACK_SIZE,NULL,5,NULL);
-
+    xTaskCreate(I2CInit, "Init I2C", configMINIMAL_STACK_SIZE , NULL, 5,
+    NULL);
     SYSconfig_UARTConfiguration(p_UART_0_struct);
     UART_tasks((void*) p_UART_0_struct);
-
     SYSconfig_UARTConfiguration(p_UART_1_struct);
     UART_tasks((void*) p_UART_1_struct);
-    xTaskCreate(TerminalMenus_MainMenu, "test menu 0", configMINIMAL_STACK_SIZE - 30, (void*)p_UART_0_struct,4, NULL);
-  //  xTaskCreate(TerminalMenus_MainMenu, "test menu 1", configMINIMAL_STACK_SIZE, (void*)p_UART_1_struct,4, NULL);
-//    xTaskCreate(SPIReadHour, "SPI time print", configMINIMAL_STACK_SIZE+20, (void*)NULL,4, NULL);
-    vTaskStartScheduler();
+    xTaskCreate(TerminalMenus_MainMenu, "test menu 0", configMINIMAL_STACK_SIZE - 30 , (void*)p_UART_0_struct, 4 , NULL);
+    xTaskCreate(TerminalMenus_MainMenu, "test menu 1", configMINIMAL_STACK_SIZE -30 , (void*)p_UART_1_struct, 4 , NULL);
+   vTaskStartScheduler();
     while(1) {
 
     }

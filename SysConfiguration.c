@@ -75,8 +75,7 @@ void SystemConfiguration(void* args) {
         *pInterface_mutex = xSemaphoreCreateMutex();
         SYSconfig_ButtonsConfiguration(); /**buttons configuration*/
         SYSconfig_SPIConfiguration(); /**SPI module configuration (including device initialization)*/
-        inicializacion_I2C();
-        // SYSconfig_I2CConfiguration(); /**I2C module configuration*/
+        SYSconfig_I2CConfiguration(); /**I2C module configuration*/
        xEventGroupSetBits(*pSubTasks_Events, FREE_MEM_EVENT|FREE_RTC_EVENT);
 
        vTaskDelete(NULL);
@@ -116,7 +115,25 @@ void SYSconfig_SPIConfiguration() {
 
 void SYSconfig_I2CConfiguration() {
 
-    inicializacion_I2C();
+    //clock enabling
+    CLOCK_EnableClock(kCLOCK_PortC); //I2C_1 pins port clock enabling
+    CLOCK_EnableClock(kCLOCK_I2c1); //I2C_1 clock enabling
+
+    //I2C_0 pins configuration
+    port_pin_config_t config_i2c = { kPORT_PullDisable, kPORT_SlowSlewRate,
+        kPORT_PassiveFilterDisable, kPORT_OpenDrainDisable,
+        kPORT_LowDriveStrength, kPORT_MuxAlt2, kPORT_UnlockRegister, };
+    PORT_SetPinConfig(PORTC, 10, &config_i2c);  //I2C_0 SCL pin configuration
+    PORT_SetPinConfig(PORTC, 11, &config_i2c);  //I2C_0 SDA pin configuration
+
+    //I2C_0 master configuration
+    i2c_master_config_t masterConfig;
+    I2C_MasterGetDefaultConfig(&masterConfig); //I2C_0 master default config. obtanined
+    masterConfig.baudRate_Bps = 100000;
+    I2C_MasterInit(I2C1, &masterConfig, CLOCK_GetFreq(kCLOCK_BusClk));
+
+    NVIC_EnableIRQ(I2C1_IRQn);
+    NVIC_SetPriority(I2C1_IRQn, 6);
 }
 
 ////////////**I2C Bug fixing functions provided by NXP*/////////////
