@@ -24,6 +24,5 @@ void TerminalMenus_LCDEcho(void* args);
 void SPIReadHour(void * args);
 
 SemaphoreHandle_t* pGetInterfaceMutex();
-
 EventGroupHandle_t* pGetSubTasksEvents();
 #endif /* TERMINAL_MENUS_H_ */

@@ -133,7 +133,7 @@ void uart_receive_task(void* args) {
     {
 
         volatile uart_transfer_t *sendXfer_function;
-        sendXfer_function = pvPortMalloc(sizeof(uart_transfer_t*));
+        sendXfer_function = pvPortMalloc(sizeof(uart_transfer_t));
         sendXfer_function->data = g_rxBuffer;
         sendXfer_function->dataSize = ECHO_BUFFER_LENGTH;
         /*Uses the transfer non blocking function to wait from data from the UART       */
@@ -159,10 +159,10 @@ void UART_tasks(void*args) {
 
     /* Creates the send and receive tasks for each UART */
     xTaskCreate(uart_send_task, "send_uart", configMINIMAL_STACK_SIZE ,
-                UART_struct, 2, NULL);
+                UART_struct, 4, NULL);
     xTaskCreate(uart_receive_task, "receive_uart",
     configMINIMAL_STACK_SIZE  ,
-                UART_struct, 2, NULL);
+                UART_struct, 4, NULL);
 
 }
 

@@ -45,6 +45,7 @@
 
 #define I2C_free (1<< 0)
 #define I2C_data_ready (1 << 1)
+#define LCD_BUSY (1<<0)
 
 EventGroupHandle_t UpdateValueByButtons_Events;
 #define DAY_UP (1 << 0)
@@ -99,6 +100,7 @@ void I2C_restart(TimerHandle_t handler)
     xSemaphoreGive(*pI2C_done);
 
 }
+
 
 EventGroupHandle_t* pGetSubTasksEvents()
 {
@@ -217,35 +219,40 @@ static TerminalMenuType_t Menus[MENUS_QUANTITY] = { //menus strings to be displa
 /////////////////////////////////////////MECHANISMS DEFINITIONS/////////////////////////////////////////////
 void MenuPrinter(uart_struct* uart_struct, uint8_t menuToBePrinted)
 {
-    uart_transfer_t* toSend_UART; /**uart queue pointer declared*/
-    uint8_t printedStringIndex = 0; /**index used to know which string has been printed*/
+
+    uart_transfer_t* toSend_UART;/**uart queue pointer declared*/
+    uint8_t printedStringIndex = 0; /** Index used to know wich string has been printed*/
     uint8_t screen_erease[] = { "\033[2J" }; /**VT100 terminal clear screen command*/
-    toSend_UART = pvPortMalloc(sizeof(uart_transfer_t*)); /**memory reservation for the uart send queue*/
-    toSend_UART->data = screen_erease; /**the data to be sent will be the screen erase command*/
-    toSend_UART->dataSize = 1; /**the data size of the uart transmission is specified to be of 1*/
+    toSend_UART = pvPortMalloc(sizeof(uart_transfer_t)); /**Memory reservation for the uart send queue*/
+    toSend_UART->data = screen_erease; /** the data to be sent will be the screen erase command*/
+    toSend_UART->dataSize = 1;
 
     xQueueSend(*uart_struct->UART_send_Queue, &toSend_UART, portMAX_DELAY); /**sends content through the UART queue to be printed in the terminal*/
 
     vTaskDelay(pdMS_TO_TICKS(20)); /**gives time for the UART to properly print the string sent*/
-    while (Menus[menuToBePrinted].Strings_quantity > printedStringIndex)
-    { /**while there is still any string to be printed then,*/
-        toSend_UART = pvPortMalloc(sizeof(uart_transfer_t*)); /**memory reservation for the uart send queue*/
+    while (Menus[menuToBePrinted].Strings_quantity > printedStringIndex) /**While there is still any string to be printed then,*/
+    {
+        toSend_UART = pvPortMalloc(sizeof(uart_transfer_t)); /**Memory reservation for the uart send queue*/
+
+        /** the data to be sent will be the terminal position VT100 command to print the string*/
         toSend_UART->data =
-                Menus[menuToBePrinted].Strings[printedStringIndex].positionXYCommand; /**the data to be sent will be the terminal position VT100 command to print the string*/
-        toSend_UART->dataSize = 1; /**the data size of the uart transmission is specified to be of 1*/
+                Menus[menuToBePrinted].Strings[printedStringIndex].positionXYCommand;
+        toSend_UART->dataSize = 1;
 
         xQueueSend(*uart_struct->UART_send_Queue, &toSend_UART, portMAX_DELAY); /**sends content through the UART queue to be printed in the terminal*/
 
         vTaskDelay(pdMS_TO_TICKS(20)); /**gives time for the UART to properly print the string sent*/
-        toSend_UART = pvPortMalloc(sizeof(uart_transfer_t*)); /**memory reservation for the uart send queue*/
+        toSend_UART = pvPortMalloc(sizeof(uart_transfer_t));
+
+        /** the data to be printed will be the strings that compund the corresponding menu*/
         toSend_UART->data =
-                Menus[menuToBePrinted].Strings[printedStringIndex].String; /**the data to be printed will be the strings that compound the corresponding menu*/
-        toSend_UART->dataSize = 1; /**the data size of the uart transmission is specified to be of 1*/
+                Menus[menuToBePrinted].Strings[printedStringIndex].String;
+        toSend_UART->dataSize = 1;
 
         xQueueSend(*uart_struct->UART_send_Queue, &toSend_UART, portMAX_DELAY); /**sends content through the UART queue to be printed in the terminal*/
 
         vTaskDelay(pdMS_TO_TICKS(20)); /**gives time for the UART to properly print the string sent*/
-        printedStringIndex++; /**printed screen index increased by one*/
+        printedStringIndex++; /** printed screen index increased by one*/
     }
 }
 
@@ -396,7 +403,7 @@ void CheckIfLineMovementAndUartEcho(uart_struct* UART_struct,
         }
         lineMoverPack->initialPositioning = pdTRUE;
         lineMoverPack->linePositionIndex = 0;
-        toSend_UART = pvPortMalloc(sizeof(uart_transfer_t*));
+        toSend_UART = pvPortMalloc(sizeof(uart_transfer_t));
         toSend_UART->dataSize = 1;
         toSend_UART->data =
                 &lineMoverPack->menuUartPositions.Positions[lineMoverPack->menuPositionLineIndex];
@@ -416,7 +423,7 @@ void CheckIfLineMovementAndUartEcho(uart_struct* UART_struct,
                 lineMoverPack->linePositionIndex++;
 
                 FIFO_push(lineMoverPack->menuPositionLineIndex, receivedChar);
-                toSend_UART = pvPortMalloc(sizeof(uart_transfer_t*));
+                toSend_UART = pvPortMalloc(sizeof(uart_transfer_t));
                 toSend_UART->dataSize = 1;
                 uint8_t buffer[2] = { 0, '\0' };
                 buffer[0] = receivedChar;
@@ -429,7 +436,7 @@ void CheckIfLineMovementAndUartEcho(uart_struct* UART_struct,
         {
             lineMoverPack->linePositionIndex++;
             FIFO_push(lineMoverPack->menuPositionLineIndex, receivedChar);
-            toSend_UART = pvPortMalloc(sizeof(uart_transfer_t*));
+            toSend_UART = pvPortMalloc(sizeof(uart_transfer_t));
             toSend_UART->dataSize = 1;
             uint8_t buffer[2] = { 0, '\0' };
             buffer[0] = receivedChar;
@@ -466,31 +473,33 @@ uint16_t ASCII_TO_uint8_t(uint8_t fifo_number, uint8_t fifo_pops)
 //////////////////////////////////////////MENUS FUNCTIONS BODIES////////////////////////////////////////////
 void TerminalMenus_MainMenu(void* args)
 {
-    pI2C_write_queue = pGetI2CHandler();    /**obtain of the i2c queue*/
-    pSPI_queue = pGetSPIHandler();  /**obtain of the spi queue*/
-    pI2C_done = pGetI2Mutex();  /**obtain the status of the i2c mutex*/
+    pI2C_write_queue = pGetI2CHandler(); /**obtain of the i2c queue*/
+    pSPI_queue = pGetSPIHandler(); /**obtain of the spi queue*/
+    pI2C_done = pGetI2Mutex();/**obtain the status of the i2c mutex*/
 
-    uart_struct* UART_struct = (uart_struct*) args; /**task input parameters copied locally*/
-    uint8_t firstEntryToMenu = pdFALSE; /**flag used to know if the task has already entered the execution*/
+    uart_struct* UART_struct = (uart_struct*) args;/**task input parameters copied locally*/
+    uint8_t firstEntryToMenu = pdFALSE;/**flag used to know if the task has already entered the execution*/
     uart_transfer_t* received_UART; /**uart transfer variable used for the queues*/
     uint8_t charReceived = 0; /**this variable holds the received char from the uart*/
-    vTaskDelay(pdMS_TO_TICKS(500)); /**gives a little bit of time by sleeping the task in order to have everything properly configured*/
+    vTaskDelay(pdMS_TO_TICKS(500)); /**gives a little bit of time by sleeping the task in order to have everuthing properly configured*/
     for (;;)
     { /**task superloop*/
         if (pdFALSE == firstEntryToMenu)
-        { /**if its the first time that the task enters the superloop then,*/
-            xSemaphoreTake(Interface_mutex, portMAX_DELAY); /**takes the mutex in order to protect the printing of the menu (especially the VT100 commands)*/
-            firstEntryToMenu = pdTRUE; /**sets the task entry point flag*/
-            MenuPrinter(UART_struct, MainMenu); //TODO: identify which terminal is inside the function
-            xSemaphoreGive(Interface_mutex); /**releases the previously taken mutex*/
+        {/**if its the first time that the task enters the superloop then,*/
+            xSemaphoreTake(Interface_mutex, portMAX_DELAY);  /**takes the mutex in order to protect the printing of the menu (especially the VT100 commands)*/
+            firstEntryToMenu = pdTRUE;  /**sets the task entry point flag*/
+            MenuPrinter(UART_struct, MainMenu);
+            xSemaphoreGive(Interface_mutex);  /**releases the previously taken mutex*/
         }
-        xQueueReceive(*UART_struct->UART_receive_Queue, &received_UART,
-                      portMAX_DELAY); /**sleeps until a char is received from the uart*/
+        xQueueReceive(*UART_struct->UART_receive_Queue, &received_UART,   /**sleeps until a char is received from the uart*/
+                      portMAX_DELAY);
         charReceived = *received_UART->data; /**the received char is stored*/
 
-        CreateMenuTask(UART_struct, charReceived - 0x30); /**sends the char to the createmenutask function in order to create the new menu*/
-        vPortFree(received_UART); /**free the uart queue received*/
-        vTaskDelete(NULL); /**the menu task is deleted*/
+        if(('1'<= charReceived) && ('9'>=charReceived)){
+            CreateMenuTask(UART_struct, charReceived - 0x30);  /**sends the char to the createmenutask function in order to create the new menu*/
+            vPortFree(received_UART);  /**free the uart queue received*/
+            vTaskDelete(NULL);  /**the menu task is deleted*/
+        }
     }
 }
 
@@ -528,7 +537,7 @@ void TerminalMenus_ReadMemory(void* args)
         if (2 <= LineMover.menuPositionLineIndex)
         {
             i2c_master_transfer_t *masterXfer_I2C_read; // = &dummy_i2c;
-            masterXfer_I2C_read = pvPortMalloc(sizeof(i2c_master_transfer_t*));
+            masterXfer_I2C_read = pvPortMalloc(sizeof(i2c_master_transfer_t));
             uint8_t BytesToRead = (uint8_t) ASCII_TO_uint8_t(1, 2);
             uint16_t subaddress = ASCII_TO_uint8_t(0, 4);
             uint8_t read_buffer[50] = { 0 };
@@ -546,7 +555,7 @@ void TerminalMenus_ReadMemory(void* args)
             xSemaphoreGive(*pI2C_done);
             vTaskDelay(pdMS_TO_TICKS(100));
             uart_transfer_t* toSend_UART;
-            toSend_UART = pvPortMalloc(sizeof(uart_transfer_t*));
+            toSend_UART = pvPortMalloc(sizeof(uart_transfer_t));
             toSend_UART->data = read_buffer;
             toSend_UART->dataSize = 1;
             xQueueSend(*UART_struct->UART_send_Queue, &toSend_UART,
@@ -590,7 +599,7 @@ void TerminalMenus_WriteMemory(void* args)
         if (2 <= LineMover.menuPositionLineIndex)
         {
             i2c_master_transfer_t *masterXfer_I2C_write;
-            masterXfer_I2C_write = pvPortMalloc(sizeof(i2c_master_transfer_t*));
+            masterXfer_I2C_write = pvPortMalloc(sizeof(i2c_master_transfer_t));
             uint16_t subaddress = ASCII_TO_uint8_t(0, 4);
             FIFO_stacks_t* local_fifo = FIFO_stacks_address(1);
             masterXfer_I2C_write->data = local_fifo->FIFO_array;
@@ -659,7 +668,7 @@ void TerminalMenus_EstablishRTCHour(void* args)
             seconds = (time_buffer[4] << 4) + time_buffer[5];
 
             i2c_master_transfer_t *masterXfer_I2C_write;
-            masterXfer_I2C_write = pvPortMalloc(sizeof(i2c_master_transfer_t*));
+            masterXfer_I2C_write = pvPortMalloc(sizeof(i2c_master_transfer_t));
             uint16_t subaddress = 0x02;/* segundos;*/
             masterXfer_I2C_write->data = &seconds;
             masterXfer_I2C_write->dataSize = 1;
@@ -674,7 +683,7 @@ void TerminalMenus_EstablishRTCHour(void* args)
             xSemaphoreGive(*pI2C_done);
 
             vTaskDelay(pdMS_TO_TICKS(50));
-            masterXfer_I2C_write = pvPortMalloc(sizeof(i2c_master_transfer_t*));
+            masterXfer_I2C_write = pvPortMalloc(sizeof(i2c_master_transfer_t));
             subaddress = 0x03;
             masterXfer_I2C_write->data = &minutes;
             masterXfer_I2C_write->dataSize = 1;
@@ -690,7 +699,7 @@ void TerminalMenus_EstablishRTCHour(void* args)
             xSemaphoreGive(*pI2C_done);
 
             vTaskDelay(pdMS_TO_TICKS(50));
-            masterXfer_I2C_write = pvPortMalloc(sizeof(i2c_master_transfer_t*));
+            masterXfer_I2C_write = pvPortMalloc(sizeof(i2c_master_transfer_t));
             subaddress = 0x04;
 
             uint8_t readBuffer = 0;
@@ -707,7 +716,7 @@ void TerminalMenus_EstablishRTCHour(void* args)
             xSemaphoreGive(*pI2C_done);
 
             readBuffer = readBuffer & 0xC0;
-            masterXfer_I2C_write = pvPortMalloc(sizeof(i2c_master_transfer_t*));
+            masterXfer_I2C_write = pvPortMalloc(sizeof(i2c_master_transfer_t));
             Hours = (readBuffer) | (time_buffer[0] << 4);
             Hours += time_buffer[1];
             masterXfer_I2C_write->data = &Hours;
@@ -770,11 +779,11 @@ void TerminalMenus_EstablishRTCDate(void* args)
             }
             days = (date_buffer[0] << 4) + (date_buffer[1]);
             months = (date_buffer[2] << 4) + (date_buffer[3]);
-            years = days + (date_buffer[5] << 6);
+            years = days | (date_buffer[5] << 6);
 
             i2c_master_transfer_t *masterXfer_I2C_write;
             uint8_t subaddress = 0x05;
-            masterXfer_I2C_write = pvPortMalloc(sizeof(i2c_master_transfer_t*));
+            masterXfer_I2C_write = pvPortMalloc(sizeof(i2c_master_transfer_t));
             masterXfer_I2C_write->data = &years;
             masterXfer_I2C_write->dataSize = 1;
             masterXfer_I2C_write->direction = kI2C_Write;
@@ -788,7 +797,7 @@ void TerminalMenus_EstablishRTCDate(void* args)
             vTaskDelay(pdMS_TO_TICKS(50));
 
             subaddress = 0x06;
-            masterXfer_I2C_write = pvPortMalloc(sizeof(i2c_master_transfer_t*));
+            masterXfer_I2C_write = pvPortMalloc(sizeof(i2c_master_transfer_t));
             masterXfer_I2C_write->data = &months;
             masterXfer_I2C_write->dataSize = 1;
             masterXfer_I2C_write->direction = kI2C_Write;
@@ -844,7 +853,7 @@ void TerminalMenus_EstablishRTCHourFormat(void* args)
             uint8_t timeFormat = 0;
             uint8_t readBuffer = 0;
             i2c_master_transfer_t *masterXfer_I2C_write;
-            masterXfer_I2C_write = pvPortMalloc(sizeof(i2c_master_transfer_t*));
+            masterXfer_I2C_write = pvPortMalloc(sizeof(i2c_master_transfer_t));
             uint16_t subaddress = 0x04;/* segundos;*/
             masterXfer_I2C_write->data = &readBuffer;
             masterXfer_I2C_write->dataSize = 1;
@@ -893,7 +902,7 @@ void TerminalMenus_EstablishRTCHourFormat(void* args)
             }
 
             vTaskDelay(pdMS_TO_TICKS(100));
-            masterXfer_I2C_write = pvPortMalloc(sizeof(i2c_master_transfer_t*));
+            masterXfer_I2C_write = pvPortMalloc(sizeof(i2c_master_transfer_t));
             masterXfer_I2C_write->data = &timeFormat;
             masterXfer_I2C_write->dataSize = 1;
             masterXfer_I2C_write->direction = kI2C_Write;
@@ -962,7 +971,7 @@ void TerminalMenus_ReadRTCHour(void* args) {
             for (index = 0; index < 3; index++)
             {
                 masterXfer_I2C_write = pvPortMalloc(
-                        sizeof(i2c_master_transfer_t*));
+                        sizeof(i2c_master_transfer_t));
                 masterXfer_I2C_write->data = &time_buffer_variable[index];
                 masterXfer_I2C_write->dataSize = 1;
                 masterXfer_I2C_write->direction = kI2C_Read;
@@ -977,7 +986,8 @@ void TerminalMenus_ReadRTCHour(void* args) {
                 vTaskDelay(pdMS_TO_TICKS(100));
                 subaddress++;
             }
-            #if 1
+
+#if 1
 			uint8_t EventValues =xEventGroupGetBits( UpdateValueByButtons_Events);
             if(0 != EventValues){
 
@@ -1000,11 +1010,11 @@ void TerminalMenus_ReadRTCHour(void* args) {
                     	minutes =(minutes > 0) ? (minutes - 1): 59;
                         break;
                 }
-    			time_buffer_variable[2] = ( (hours/10)<< 4) + ((hours - (hours/10)*10));
+    			time_buffer_variable[2] = ((time_buffer_variable[2] & TimeFormatMaskSet) |((( hours/10)<< 4) + (hours - (hours/10)*10) ));
     			time_buffer_variable[1] = ( (minutes/10)<< 4) + ((minutes - (minutes/10)*10));
 
     			i2c_master_transfer_t* masterXfer_changed_hours;
-    			masterXfer_changed_hours = pvPortMalloc(sizeof(i2c_master_transfer_t*));
+    			masterXfer_changed_hours = pvPortMalloc(sizeof(i2c_master_transfer_t));
     			uint32_t minutes_subaddres = 0x03;
                 masterXfer_changed_hours->data = &(time_buffer_variable[1]);
                 masterXfer_changed_hours->dataSize = 1;
@@ -1020,7 +1030,7 @@ void TerminalMenus_ReadRTCHour(void* args) {
                 xSemaphoreGive(*pI2C_done);
 
 
-            	masterXfer_changed_hours = pvPortMalloc(sizeof(i2c_master_transfer_t*));
+            	masterXfer_changed_hours = pvPortMalloc(sizeof(i2c_master_transfer_t));
             	uint32_t hours_subaddress = 0x04;
             	masterXfer_changed_hours->data = &(time_buffer_variable[2]);
             	masterXfer_changed_hours->dataSize = 1;
@@ -1077,7 +1087,7 @@ void TerminalMenus_ReadRTCHour(void* args) {
                 time_buffer_variable[2] = (temporalBuffer
                         | (temporalHoursTens << 4)) + temporalHoursUnits;
                 masterXfer_I2C_write = pvPortMalloc(
-                        sizeof(i2c_master_transfer_t*));
+                        sizeof(i2c_master_transfer_t));
                 masterXfer_I2C_write->data = &time_buffer_variable[2];
                 masterXfer_I2C_write->dataSize = 1;
                 masterXfer_I2C_write->direction = kI2C_Write;
@@ -1098,14 +1108,14 @@ void TerminalMenus_ReadRTCHour(void* args) {
             }
 
             uart_transfer_t* toSend_UART;
-            toSend_UART = pvPortMalloc(sizeof(uart_transfer_t*));
+            toSend_UART = pvPortMalloc(sizeof(uart_transfer_t));
             toSend_UART->data = printing_time_chars;
             toSend_UART->dataSize = 1;
             xQueueSend(*UART_struct->UART_send_Queue, &toSend_UART,
                        portMAX_DELAY);
             vTaskDelay(pdMS_TO_TICKS(50));
 
-            toSend_UART = pvPortMalloc(sizeof(uart_transfer_t*));
+            toSend_UART = pvPortMalloc(sizeof(uart_transfer_t));
 
             uint8_t AM[] = { "  AM" };
             uint8_t PM[] = { "  PM" };
@@ -1128,7 +1138,7 @@ void TerminalMenus_ReadRTCHour(void* args) {
                        portMAX_DELAY);
             vTaskDelay(pdMS_TO_TICKS(50));
 
-            toSend_UART = pvPortMalloc(sizeof(uart_transfer_t*));
+            toSend_UART = pvPortMalloc(sizeof(uart_transfer_t));
             toSend_UART->data = &LineMover.menuUartPositions.Positions[0];
             xQueueSend(*UART_struct->UART_send_Queue, &toSend_UART,
                        portMAX_DELAY);
@@ -1157,7 +1167,7 @@ void TerminalMenus_ReadRTCDate(void* args)
     for (;;)
     {
 
-        uart_transfer_t* received_UART = &dummy_uart;
+        uart_transfer_t* received_UART ;
         xLastWakeTime = xTaskGetTickCount();
         /**The task checks if it's the first time in the task, so that the menu is printed*/
         if (pdFALSE == firstEntryToMenu)
@@ -1167,12 +1177,14 @@ void TerminalMenus_ReadRTCDate(void* args)
             MenuPrinter(UART_struct, ReadDate); //TODO: identify which terminal is inside the function
             xSemaphoreGive(Interface_mutex);
         }
-        xQueueReceive(*UART_struct->UART_receive_Queue, &received_UART, 0);
+        if(pdPASS == xQueueReceive(*UART_struct->UART_receive_Queue, &received_UART, 0)){
 
         charReceived = *received_UART->data;
+        vPortFree(received_UART);
+
+        }
         if (0 != charReceived)
         {
-            // vPortFree(received_UART);
             CharacterValidator(&LineMover, ReadDate, charReceived);
             CheckIfReturnToMenu(UART_struct, charReceived, RTC_TASK);
             CheckIfLineMovementAndUartEcho(UART_struct, charReceived,
@@ -1187,7 +1199,7 @@ void TerminalMenus_ReadRTCDate(void* args)
             for (index = 0; index < 2; index++)
             {
                 masterXfer_I2C_write = pvPortMalloc(
-                        sizeof(i2c_master_transfer_t*));
+                        sizeof(i2c_master_transfer_t));
                 masterXfer_I2C_write->data = &time_buffer_variable[index];
                 masterXfer_I2C_write->dataSize = 1;
                 masterXfer_I2C_write->direction = kI2C_Read;
@@ -1195,13 +1207,122 @@ void TerminalMenus_ReadRTCDate(void* args)
                 masterXfer_I2C_write->slaveAddress = 0x50;
                 masterXfer_I2C_write->subaddress = (uint32_t) subaddress;
                 masterXfer_I2C_write->subaddressSize = 1;
+
+//                xTimerStart(I2C_Timer_Handler,0);
                 xQueueSend(*pI2C_write_queue, &masterXfer_I2C_write,
                            portMAX_DELAY);
                 xSemaphoreTake(*pI2C_done, portMAX_DELAY);
+//                if(? == xTimerStop(I2C_Timer_Handler,0)){
+//                    PRINTF(" ERROR DE LECTURA RTC");
+//                }
+
                 xSemaphoreGive(*pI2C_done);
                 vTaskDelay(pdMS_TO_TICKS(50));
                 subaddress++;
             }
+
+#if 1
+           uint8_t EventValues =xEventGroupGetBits( UpdateValueByButtons_Events);
+           if(0 != EventValues){
+
+               uint8_t day = ((time_buffer_variable[0] >> 4) & 0x03)*10 + (time_buffer_variable[0] & 0xF) ;
+               uint8_t month = ((time_buffer_variable[1] >> 4)& 0x03)*10 + (time_buffer_variable[1] &0xF);
+
+               switch (EventValues){
+                   case 0:
+                       break;
+                   case MONTH_UP:
+                       month = (month < 12) ? (month + 1): 1;
+                       break;
+                   case MONTH_DOWN:
+                       month =(month > 1) ? (month - 1): 12;
+                       break;
+                   case DAY_UP:
+                       switch(month){
+                           case 1://Enero
+                           case 3://Marzo
+                           case 5://Mayo
+                           case 7://Julio
+                           case 8://Agosto
+                           case 10://Octubre
+                           case 12://diciembre
+                               day = (day < 31) ? (day +1 ) : 1;
+                               break;
+                           case 2://febrero
+                               day = (day < 28) ? (day + 1) : 1;
+                               break;
+                           default:
+                               day = (day < 30) ? (day + 1) : 1;
+                               break;
+                       }
+                       break;
+                   case DAY_DOWN:
+                       switch(month){
+                                         case 1://Enero
+                                         case 3://Marzo
+                                         case 5://Mayo
+                                         case 7://Julio
+                                         case 8://Agosto
+                                         case 10://Octubre
+                                         case 12://diciembre
+                                             day = (day > 2) ? (day  - 1 ) : 31;
+                                             break;
+                                         case 2://febrero
+                                             day = (day > 2) ? (day - 1) : 30;
+                                             break;
+                                         default:
+                                             day = (day > 2) ? (day - 1) : 28;
+                                             break;
+                                     }
+                                     break;
+               }
+               time_buffer_variable[1] = ( (month/10) << 4) + ((month - (month/10)*10));
+               time_buffer_variable[0] = ((time_buffer_variable[0] & 0xC0 ) |(( (day/10)<< 4) + ((day - (day/10)*10))));
+
+               i2c_master_transfer_t* masterXfer_changed_hours;
+               masterXfer_changed_hours = pvPortMalloc(sizeof(i2c_master_transfer_t));
+               uint32_t minutes_subaddres = 0x05;
+               masterXfer_changed_hours->data = &(time_buffer_variable[0]);
+               masterXfer_changed_hours->dataSize = 1;
+               masterXfer_changed_hours->direction = kI2C_Write;
+               masterXfer_changed_hours->flags = kI2C_TransferDefaultFlag;
+               masterXfer_changed_hours->slaveAddress = 0x50;
+               masterXfer_changed_hours->subaddress = (uint32_t) minutes_subaddres;
+               masterXfer_changed_hours->subaddressSize = 1;
+
+               vTaskDelay(pdMS_TO_TICKS(50));
+               xQueueSend(*pI2C_write_queue, &masterXfer_changed_hours, portMAX_DELAY);
+               xSemaphoreTake(*pI2C_done, portMAX_DELAY);
+               xSemaphoreGive(*pI2C_done);
+
+
+               masterXfer_changed_hours = pvPortMalloc(sizeof(i2c_master_transfer_t));
+               uint32_t hours_subaddress = 0x06;
+               masterXfer_changed_hours->data = &(time_buffer_variable[1]);
+               masterXfer_changed_hours->dataSize = 1;
+               masterXfer_changed_hours->direction = kI2C_Write;
+               masterXfer_changed_hours->flags = kI2C_TransferDefaultFlag;
+               masterXfer_changed_hours->slaveAddress = 0x50;
+               masterXfer_changed_hours->subaddress = (uint32_t) hours_subaddress;
+               masterXfer_changed_hours->subaddressSize = 1;
+
+               vTaskDelay(pdMS_TO_TICKS(50));
+               xQueueSend(*pI2C_write_queue, &masterXfer_changed_hours, portMAX_DELAY);
+               xSemaphoreTake(*pI2C_done, portMAX_DELAY);
+               xSemaphoreGive(*pI2C_done);
+
+
+
+
+           }
+
+
+
+
+           xEventGroupClearBits(UpdateValueByButtons_Events, DAY_UP|DAY_DOWN|MONTH_UP|MONTH_DOWN);
+#endif
+
+
             printing_time_chars[0] = ((time_buffer_variable[0] & TensMask) >> 4)
                     + '0';
             printing_time_chars[1] = (time_buffer_variable[0] & UnitsMask)
@@ -1218,14 +1339,14 @@ void TerminalMenus_ReadRTCDate(void* args)
             printing_time_chars[8] = '\0';
 
             uart_transfer_t* toSend_UART;
-            toSend_UART = pvPortMalloc(sizeof(uart_transfer_t*));
+            toSend_UART = pvPortMalloc(sizeof(uart_transfer_t));
             toSend_UART->data = printing_time_chars;
             toSend_UART->dataSize = 1;
             xQueueSend(*UART_struct->UART_send_Queue, &toSend_UART,
                        portMAX_DELAY);
             vTaskDelay(pdMS_TO_TICKS(50));
 
-            toSend_UART = pvPortMalloc(sizeof(uart_transfer_t*));
+            toSend_UART = pvPortMalloc(sizeof(uart_transfer_t));
             toSend_UART->data = &LineMover.menuUartPositions.Positions[0];
             xQueueSend(*UART_struct->UART_send_Queue, &toSend_UART,
                        portMAX_DELAY);
@@ -1270,7 +1391,7 @@ void TerminalMenus_TerminalsCommunication(void* args)
 
             MenuPrinter(UART_struct, Terminal2Communication); /**prints in the current terminal the chat menu interface*/
 
-            toSend_UART = pvPortMalloc(sizeof(uart_transfer_t*)); /**memory is reserved for a UART transference*/
+            toSend_UART = pvPortMalloc(sizeof(uart_transfer_t)); /**memory is reserved for a UART transference*/
             toSend_UART->data = UART_struct->ChatStates->chatPosition; /**the data to be sent through the UART is the shared terminal position*/
             xQueueSend(*UART_struct->UART_send_Queue, &toSend_UART,
                        portMAX_DELAY);  /**sends content through the UART queue to be printed in the terminal*/
@@ -1290,7 +1411,7 @@ void TerminalMenus_TerminalsCommunication(void* args)
                     && pdTRUE
                             == (UART_struct->ChatStates->terminalChatStates[UART_1]))
             { /**if this is the terminal 0, and the other terminal is also inside the chat menu then,*/
-                toSend_UART = pvPortMalloc(sizeof(uart_transfer_t*)); /**memory is reserved for a UART transference*/
+                toSend_UART = pvPortMalloc(sizeof(uart_transfer_t)); /**memory is reserved for a UART transference*/
                 toSend_UART->data = connection_array; /**the data to be sent will be the terminal identification string*/
                 xQueueSend(*UART_struct->ChatStates->UART1_send_Queue,
                            &toSend_UART, portMAX_DELAY); /**data is sent to the uart 1*/
@@ -1300,7 +1421,7 @@ void TerminalMenus_TerminalsCommunication(void* args)
                     && pdTRUE
                             == (UART_struct->ChatStates->terminalChatStates[UART_0]))
             { /**if this is the terminal 1, and the other terminal is also inside the chat menu then,*/
-                toSend_UART = pvPortMalloc(sizeof(uart_transfer_t*)); /**memory is reserved for a UART transference*/
+                toSend_UART = pvPortMalloc(sizeof(uart_transfer_t)); /**memory is reserved for a UART transference*/
                 toSend_UART->data = connection_array; /**the data to be sent will be the terminal identification string*/
                 xQueueSend(*UART_struct->ChatStates->UART0_send_Queue,
                            &toSend_UART, portMAX_DELAY); /**data is sent to the uart 0*/
@@ -1313,35 +1434,35 @@ void TerminalMenus_TerminalsCommunication(void* args)
             { /**if both terminals are in the chat menu*/
 
                 uint8_t messageZonePosition[] = { "\033[04;10H\0" }; /**VT100 command to establish the message indication zone string*/
-                toSend_UART = pvPortMalloc(sizeof(uart_transfer_t*)); /**memory is reserved for a UART transference*/
+                toSend_UART = pvPortMalloc(sizeof(uart_transfer_t)); /**memory is reserved for a UART transference*/
                 toSend_UART->data = messageZonePosition; /**the data to be sent will be the position VT100 command for the message printing in the terminal*/
                 xQueueSend(*UART_struct->ChatStates->UART0_send_Queue,
                            &toSend_UART, portMAX_DELAY);    /**sends info to the terminal 1*/
                 vTaskDelay(pdMS_TO_TICKS(20)); /**gives time for the UART to properly print the string sent*/
-                toSend_UART = pvPortMalloc(sizeof(uart_transfer_t*)); /**memory is reserved for a UART transference*/
+                toSend_UART = pvPortMalloc(sizeof(uart_transfer_t)); /**memory is reserved for a UART transference*/
                 toSend_UART->data = messageZonePosition; /**the data to be sent will be the position VT100 command for the message printing in the terminal*/
                 xQueueSend(*UART_struct->ChatStates->UART1_send_Queue,
                            &toSend_UART, portMAX_DELAY); /**sends info to the terminal 2*/
                 vTaskDelay(pdMS_TO_TICKS(20)); /**gives time for the UART to properly print the string sent*/
                 uint8_t messageZone[] = { "Mensaje a enviar:" };
-                toSend_UART = pvPortMalloc(sizeof(uart_transfer_t*)); /**memory is reserved for a UART transference*/
+                toSend_UART = pvPortMalloc(sizeof(uart_transfer_t)); /**memory is reserved for a UART transference*/
                 toSend_UART->data = messageZone; /**the data to be sent will be a string*/
                 xQueueSend(*UART_struct->ChatStates->UART0_send_Queue,
                            &toSend_UART, portMAX_DELAY); /**sends info to the terminal 1*/
                 vTaskDelay(pdMS_TO_TICKS(20)); /**gives time for the UART to properly print the string sent*/
-                toSend_UART = pvPortMalloc(sizeof(uart_transfer_t*)); /**memory is reserved for a UART transference*/
+                toSend_UART = pvPortMalloc(sizeof(uart_transfer_t)); /**memory is reserved for a UART transference*/
                 toSend_UART->data = messageZone; /**the data to be sent will be a string*/
                 xQueueSend(*UART_struct->ChatStates->UART1_send_Queue,
                            &toSend_UART, portMAX_DELAY); /**sends info to the terminal 2*/
                 vTaskDelay(pdMS_TO_TICKS(20)); /**gives time for the UART to properly print the string sent*/
 
                 UART_struct->ChatStates->chatPosition[3] = '5';
-                toSend_UART = pvPortMalloc(sizeof(uart_transfer_t*)); /**memory is reserved for a UART transference*/
+                toSend_UART = pvPortMalloc(sizeof(uart_transfer_t)); /**memory is reserved for a UART transference*/
                 toSend_UART->data = UART_struct->ChatStates->chatPosition; /**the data to be sent through the UART is the shared terminal position*/
                 xQueueSend(*UART_struct->ChatStates->UART0_send_Queue,
                            &toSend_UART, portMAX_DELAY); /**sends info to the terminal 1*/
                 vTaskDelay(pdMS_TO_TICKS(20)); /**gives time for the UART to properly print the string sent*/
-                toSend_UART = pvPortMalloc(sizeof(uart_transfer_t*)); /**memory is reserved for a UART transference*/
+                toSend_UART = pvPortMalloc(sizeof(uart_transfer_t)); /**memory is reserved for a UART transference*/
                 toSend_UART->data = UART_struct->ChatStates->chatPosition; /**the data to be sent through the UART is the shared terminal position*/
                 xQueueSend(*UART_struct->ChatStates->UART1_send_Queue,
                            &toSend_UART, portMAX_DELAY); /**sends info to the terminal 2*/
@@ -1364,7 +1485,7 @@ void TerminalMenus_TerminalsCommunication(void* args)
                 CharacterValidator(&LineMover, Terminal2Communication,
                                    charReceived[0]); /**the received char is validated to see if its a valid menu char*/
 
-                toSend_UART = pvPortMalloc(sizeof(uart_transfer_t*)); /**memory is reserved for a UART transference*/
+                toSend_UART = pvPortMalloc(sizeof(uart_transfer_t)); /**memory is reserved for a UART transference*/
                 toSend_UART->data =
                         UART_struct->ChatStates->localPosition[UART_struct->uart_number].localPrint; /**the data to be sent will be the local terminal position*/
                 xQueueSend(*UART_struct->UART_send_Queue, &toSend_UART,
@@ -1392,7 +1513,7 @@ void TerminalMenus_TerminalsCommunication(void* args)
                 { /**if the received char is neither enter nor return*/
                     charReceived[1] = '\0'; /**the received char array is asured to end with an end of char char*/
                     FIFO_push(UART_struct->uart_number, charReceived[0]); /**pushes the local terminal received char in the local terminal fifo*/
-                    toSend_UART = pvPortMalloc(sizeof(uart_transfer_t*)); /**memory is reserved for a UART transference*/
+                    toSend_UART = pvPortMalloc(sizeof(uart_transfer_t)); /**memory is reserved for a UART transference*/
                     toSend_UART->data = charReceived; /**the data to be sent to the uart will be the received char*/
                     xQueueSend(*UART_struct->UART_send_Queue, &toSend_UART,
                                portMAX_DELAY); /**sends content through the UART queue to be printed in the terminal*/
@@ -1403,12 +1524,12 @@ void TerminalMenus_TerminalsCommunication(void* args)
                 if (RETURN == charReceived[0])
                 { /**if the received char is a return to main menu,*/
 
-                    toSend_UART = pvPortMalloc(sizeof(uart_transfer_t*)); /**memory is reserved for a UART transference*/
+                    toSend_UART = pvPortMalloc(sizeof(uart_transfer_t)); /**memory is reserved for a UART transference*/
                     toSend_UART->data = UART_struct->ChatStates->chatPosition; /**the data to be sent through the UART is the shared terminal position*/
                     xQueueSend(*UART_struct->ChatStates->UART0_send_Queue,
                                &toSend_UART, portMAX_DELAY); /**data will be sent to the terminal 1*/
                     vTaskDelay(pdMS_TO_TICKS(20)); /**gives time for the UART to properly print the string sent*/
-                    toSend_UART = pvPortMalloc(sizeof(uart_transfer_t*));
+                    toSend_UART = pvPortMalloc(sizeof(uart_transfer_t));
                     toSend_UART->data = UART_struct->ChatStates->chatPosition; /**the data to be sent through the UART is the shared terminal position*/
                     xQueueSend(*UART_struct->ChatStates->UART1_send_Queue,
                                &toSend_UART, portMAX_DELAY); /**data will be sent to the terminal 2*/
@@ -1418,7 +1539,7 @@ void TerminalMenus_TerminalsCommunication(void* args)
                                     == (UART_struct->ChatStates->terminalChatStates[UART_0]))
                     { /**if the current terminal to exit is uart 1 and the other terminal is inside the chat menu,*/
                         uint8_t byebye[] = { "Terminal 2 se desconecto" }; /**exiting message to be sent to the other uart*/
-                        toSend_UART = pvPortMalloc(sizeof(uart_transfer_t*)); /**memory is reserved for a UART transference*/
+                        toSend_UART = pvPortMalloc(sizeof(uart_transfer_t)); /**memory is reserved for a UART transference*/
                         toSend_UART->data = byebye; /**the data to be sent will be the exiting message*/
                         xQueueSend(*UART_struct->ChatStates->UART0_send_Queue,
                                    &toSend_UART, portMAX_DELAY); /**data is sent to the terminal 1*/
@@ -1428,7 +1549,7 @@ void TerminalMenus_TerminalsCommunication(void* args)
                                     == (UART_struct->ChatStates->terminalChatStates[UART_1]))
                     { /**if the current terminal to exit is uart 1 and the other terminal is inside the chat menu,*/
                         uint8_t byebye[] = { "Terminal 1 se desconecto" }; /**exiting message to be sent to the other uart*/
-                        toSend_UART = pvPortMalloc(sizeof(uart_transfer_t*)); /**memory is reserved for a UART transference*/
+                        toSend_UART = pvPortMalloc(sizeof(uart_transfer_t)); /**memory is reserved for a UART transference*/
                         toSend_UART->data = byebye; /**the data to be sent will be the exiting message*/
                         xQueueSend(*UART_struct->ChatStates->UART1_send_Queue,
                                    &toSend_UART, portMAX_DELAY);  /**data is sent to the terminal 2*/
@@ -1474,19 +1595,19 @@ void TerminalMenus_TerminalsCommunication(void* args)
 
                 if (ENTER == charReceived[0])
                 { /**if the received char was an enter (i.e. sent to the chat),*/
-                    toSend_UART = pvPortMalloc(sizeof(uart_transfer_t*)); /**memory is reserved for a UART transference*/
+                    toSend_UART = pvPortMalloc(sizeof(uart_transfer_t)); /**memory is reserved for a UART transference*/
                     toSend_UART->data = UART_struct->ChatStates->chatPosition; /**the data to be sent through the UART is the shared terminal position*/
                     xQueueSend(*UART_struct->ChatStates->UART0_send_Queue,
                                &toSend_UART, portMAX_DELAY); /**data is sent to the terminal 1*/
                     vTaskDelay(pdMS_TO_TICKS(20)); /**gives time for the UART to properly print the string sent*/
-                    toSend_UART = pvPortMalloc(sizeof(uart_transfer_t*)); /**memory is reserved for a UART transference*/
+                    toSend_UART = pvPortMalloc(sizeof(uart_transfer_t)); /**memory is reserved for a UART transference*/
                     toSend_UART->data = UART_struct->ChatStates->chatPosition; /**the data to be sent through the UART is the shared terminal position*/
                     xQueueSend(*UART_struct->ChatStates->UART1_send_Queue,
                                &toSend_UART, portMAX_DELAY); /**data is sent to the terminal 2*/
                     vTaskDelay(pdMS_TO_TICKS(20)); /**gives time for the UART to properly print the string sent*/
 
                     uint8_t terminalSpeaker[] = { "Terminal x: " }; /**message that will say which terminal has sent the message*/
-                    toSend_UART = pvPortMalloc(sizeof(uart_transfer_t*)); /**memory is reserved for a UART transference*/
+                    toSend_UART = pvPortMalloc(sizeof(uart_transfer_t)); /**memory is reserved for a UART transference*/
                     terminalSpeaker[9] =
                             (UART_0 == UART_struct->uart_number) ? '1' : '2'; /**according to which terminal is sending
                                                                               the message, the terminal speaker message
@@ -1495,7 +1616,7 @@ void TerminalMenus_TerminalsCommunication(void* args)
                     xQueueSend(*UART_struct->ChatStates->UART0_send_Queue,
                                &toSend_UART, portMAX_DELAY); /**data is sent to the terminal 1*/
                     vTaskDelay(pdMS_TO_TICKS(20)); /**gives time for the UART to properly print the string sent*/
-                    toSend_UART = pvPortMalloc(sizeof(uart_transfer_t*)); /**memory is reserved for a UART transference*/
+                    toSend_UART = pvPortMalloc(sizeof(uart_transfer_t)); /**memory is reserved for a UART transference*/
                     toSend_UART->data = terminalSpeaker; /**the data to be sent will be the terminal speaker message*/
                     xQueueSend(*UART_struct->ChatStates->UART1_send_Queue,
                                &toSend_UART, portMAX_DELAY); /**data is sent to the terminal 2*/
@@ -1505,12 +1626,12 @@ void TerminalMenus_TerminalsCommunication(void* args)
                     { /**while there is something to take out from the fifo,*/
                         charToBePrinted[0] = FIFO_pop(UART_struct->uart_number); /**takes the char to be printed from the fifo*/
                         charToBePrinted[1] = '\0'; /**the char to be printed is assured to end with an end of char char*/
-                        toSend_UART = pvPortMalloc(sizeof(uart_transfer_t*)); /**memory is reserved for a UART transference*/
+                        toSend_UART = pvPortMalloc(sizeof(uart_transfer_t)); /**memory is reserved for a UART transference*/
                         toSend_UART->data = charToBePrinted; /**the data to be printed will be the popped char*/
                         xQueueSend(*UART_struct->ChatStates->UART0_send_Queue,
                                    &toSend_UART, portMAX_DELAY); /**data is sent to the terminal 1*/
                         vTaskDelay(pdMS_TO_TICKS(20)); /**gives time for the UART to properly print the string sent*/
-                        toSend_UART = pvPortMalloc(sizeof(uart_transfer_t*)); /**memory is reserved for a UART transference*/
+                        toSend_UART = pvPortMalloc(sizeof(uart_transfer_t)); /**memory is reserved for a UART transference*/
                         toSend_UART->data = charToBePrinted; /**the data to be printed will be the popped char*/
                         xQueueSend(*UART_struct->ChatStates->UART1_send_Queue,
                                    &toSend_UART, portMAX_DELAY); /**data is sent to the terminal 2*/
@@ -1553,7 +1674,7 @@ void TerminalMenus_TerminalsCommunication(void* args)
                     UART_struct->ChatStates->localPosition[UART_struct->uart_number].localPrint[8] =
                             '\0';
 
-                    toSend_UART = pvPortMalloc(sizeof(uart_transfer_t*)); /**memory is reserved for a UART transference*/
+                    toSend_UART = pvPortMalloc(sizeof(uart_transfer_t)); /**memory is reserved for a UART transference*/
                     toSend_UART->data =
                             UART_struct->ChatStates->localPosition[UART_struct->uart_number].localPrint; /**the data to be printed will be the local position*/
                     xQueueSend(*UART_struct->UART_send_Queue, &toSend_UART,
@@ -1564,7 +1685,7 @@ void TerminalMenus_TerminalsCommunication(void* args)
                     uint8_t writeZoneCleaner[] = { " \0" }; /**char used for cleaning the top space*/
                     for (index = 0; index < 51; index++)
                     { /**loop that clears space by space the upmost space*/
-                        toSend_UART = pvPortMalloc(sizeof(uart_transfer_t*)); /**memory is reserved for a UART transference*/
+                        toSend_UART = pvPortMalloc(sizeof(uart_transfer_t)); /**memory is reserved for a UART transference*/
                         toSend_UART->data = writeZoneCleaner; /**the data to be sent will be the cleaning char*/
                         xQueueSend(*UART_struct->UART_send_Queue, &toSend_UART,
                                    portMAX_DELAY); /**sends content through the UART queue to be printed in the terminal*/
@@ -1591,7 +1712,7 @@ void TerminalMenus_TerminalsCommunication(void* args)
                     UART_struct->ChatStates->localPosition[UART_struct->uart_number].localPrint[8] =
                             '\0';
 
-                    toSend_UART = pvPortMalloc(sizeof(uart_transfer_t*)); /**memory is reserved for a UART transference*/
+                    toSend_UART = pvPortMalloc(sizeof(uart_transfer_t)); /**memory is reserved for a UART transference*/
                     toSend_UART->data =
                             UART_struct->ChatStates->localPosition[UART_struct->uart_number].localPrint; /**the data to be sent will be the local position*/
                     xQueueSend(*UART_struct->UART_send_Queue, &toSend_UART,
@@ -1663,7 +1784,8 @@ void TerminalMenus_LCDEcho(void* args)
     pdFALSE, { pdFALSE, pdTRUE, pdTRUE }, { { { "\033[14;10H" } } }, //struct with constant position reference used in memory read menu
         { 10000, 0 } }; /**structure which holds the information for the check if line movement function and the character validator function*/
     for (;;)
-    { /**practica superloop*/
+    { /**practic superloop*/
+
         /**The task checks if it's the first time in the task, so that the menu is printed*/
         if (pdFALSE == firstEntryToMenu)
         { /**if its the first time the task enters the superloop*/
@@ -1679,7 +1801,8 @@ void TerminalMenus_LCDEcho(void* args)
 
         if (RETURN == charReceived)
         { /**if the received char is a return to menu*/
-            charToBeMirrored = pvPortMalloc(sizeof(SPI_msg_t*)); /**memory is reserved for the uart executable*/
+
+            charToBeMirrored = pvPortMalloc(sizeof(SPI_msg_t)); /**memory is reserved for the uart executable*/
             charToBeMirrored->LCD_to_be_clear = pdTRUE; /**the spi screen is ereased*/
             xQueueSend(*pSPI_queue, &charToBeMirrored, portMAX_DELAY); /**the received char is sent to the current spi queue*/
             CheckIfLineMovementAndUartEcho(UART_struct, charReceived,
@@ -1690,7 +1813,7 @@ void TerminalMenus_LCDEcho(void* args)
             CharacterValidator(&LineMover, LCDEcho, charReceived);
             CheckIfLineMovementAndUartEcho(UART_struct, charReceived,
                                            &LineMover);
-            charToBeMirrored = pvPortMalloc(sizeof(SPI_msg_t*)); /**memory is reserved for the spi message to me snet,*/
+            charToBeMirrored = pvPortMalloc(sizeof(SPI_msg_t)); /**memory is reserved for the spi message to me snet,*/
             charToBeMirrored->LCD_to_be_clear = pdFALSE; /**the spi screen doesnt need screen cleaning*/
 
             /**copy of the received char into a buffer*/
@@ -1709,12 +1832,14 @@ void SPIReadHour(void * args)
     TickType_t xLastWakeTime; /**variable used to know when was the last wake time*/
     const TickType_t xPeriod = pdMS_TO_TICKS(1000); /**the task period will be of 1s*/
     volatile int8_t time_buffer_variable[3]; /**rtc time reading buffer*/
-    uint8_t printing_time_chars[9] = { '0' }; /**array that will hould the hour/date info to be printed on the spi screen*/
+    uint8_t printing_time_chars[12] = { '0' }; /**array that will hould the hour/date info to be printed on the spi screen*/
+    uint8_t printing_date_chars[12] = { '0' }; /**array that will hould the hour/date info to be printed on the spi screen*/
     SPI_msg_t *timeString; /**where the printing time chars will be concatenated for posterior sending*/
     i2c_master_transfer_t *masterXfer_I2C_write; /**master transfer variable used for I2C transfers*/
     uint8_t index; /**index variable used for the for loop*/
-    vTaskDelay(pdMS_TO_TICKS(1000)); /**1s the task is sent to sleep in order to assure previous correct modules initialization*/
+    vTaskDelay(pdMS_TO_TICKS(500)); /**1s the task is sent to sleep in order to assure previous correct modules initialization*/
     for (;;)
+
     { /**task superloop*/
         xLastWakeTime = xTaskGetTickCount(); /**gets the passed ticks*/
 
@@ -1723,7 +1848,7 @@ void SPIReadHour(void * args)
         {
             /**master transfer configuration, memory reservation, mastertransfer is sent to the I2C with
                                                         * its queue, and the subaddress is increased by one*/
-            masterXfer_I2C_write = pvPortMalloc(sizeof(i2c_master_transfer_t*));
+            masterXfer_I2C_write = pvPortMalloc(sizeof(i2c_master_transfer_t));
             masterXfer_I2C_write->data = &time_buffer_variable[index];
             masterXfer_I2C_write->dataSize = 1;
             masterXfer_I2C_write->direction = kI2C_Read;
@@ -1754,35 +1879,12 @@ void SPIReadHour(void * args)
                 + '0';
         printing_time_chars[8] = '\0';
 
-        /**hour message zone indicating message is sent to the SPI screen*/
-        uint8_t HourString[12] = { "Hour:       " };
-        timeString = pvPortMalloc(sizeof(SPI_msg_t*));
-        timeString->LCD_to_be_clear = pdFALSE;
-        timeString->string = HourString;
-        xQueueSend(*pSPI_queue, &timeString, portMAX_DELAY);
-        vTaskDelay(pdMS_TO_TICKS(100));
-
-        /**hour string is sent to the SPI screen*/
-        timeString = pvPortMalloc(sizeof(SPI_msg_t*));
-        timeString->LCD_to_be_clear = pdFALSE;
-        timeString->string = printing_time_chars;
-        xQueueSend(*pSPI_queue, &timeString, portMAX_DELAY);
-        vTaskDelay(pdMS_TO_TICKS(100));
-
-        /**spacing string is sent to the SPI screen*/
-        uint8_t SpaceString[12] = { "            " };
-        timeString = pvPortMalloc(sizeof(SPI_msg_t*));
-        timeString->LCD_to_be_clear = pdFALSE;
-        timeString->string = SpaceString;
-        xQueueSend(*pSPI_queue, &timeString, portMAX_DELAY);
-        vTaskDelay(pdMS_TO_TICKS(100));
-
         subaddress = 0x05; /**the starting subaddress is set to 0x02 as it is the days register*/
         for (index = 0; index < 3; index++)
         {
             /**master transfer configuration, memory reservation, mastertransfer is sent to the I2C with
                                                                     * its queue, and the subaddress is increased by one*/
-            masterXfer_I2C_write = pvPortMalloc(sizeof(i2c_master_transfer_t*));
+            masterXfer_I2C_write = pvPortMalloc(sizeof(i2c_master_transfer_t));
             masterXfer_I2C_write->data = &time_buffer_variable[index];
             masterXfer_I2C_write->dataSize = 1;
             masterXfer_I2C_write->direction = kI2C_Read;
@@ -1798,36 +1900,57 @@ void SPIReadHour(void * args)
         }
 
         /**after reading the registers, the date is properly interpreted and stored, and also converted to ascii*/
-        printing_time_chars[0] = ((time_buffer_variable[0] & TensMask) >> 4)
+        printing_date_chars[0] = ((time_buffer_variable[0] & TensMask) >> 4)
                 + '0';
-        printing_time_chars[1] = (time_buffer_variable[0] & UnitsMask) + '0';
-        printing_time_chars[2] = '/';
-        printing_time_chars[3] = ((time_buffer_variable[1] & TensMask) >> 4)
+        printing_date_chars[1] = (time_buffer_variable[0] & UnitsMask) + '0';
+        printing_date_chars[2] = '/';
+        printing_date_chars[3] = ((time_buffer_variable[1] & TensMask) >> 4)
                 + '0';
-        printing_time_chars[4] = (time_buffer_variable[1] & UnitsMask) + '0';
-        printing_time_chars[5] = '/';
-        printing_time_chars[6] = '1';
-        printing_time_chars[7] = (time_buffer_variable[0] & YearsMask >> 6)
+        printing_date_chars[4] = (time_buffer_variable[1] & UnitsMask) + '0';
+        printing_date_chars[5] = '/';
+        printing_date_chars[6] = '1';
+        printing_date_chars[7] = (time_buffer_variable[0] & YearsMask >> 6)
                 + '0';
-        printing_time_chars[8] = '\0';
+        printing_date_chars[8] = '\0';
 
-        /**date message zone indicating message is sent to the SPI screen*/
-        uint8_t DateString[12] = { "Date:       " };
-        timeString = pvPortMalloc(sizeof(SPI_msg_t*));
+        /**hour message zone indicating message is sent to the SPI screen*/
+        uint8_t HourString[15] = { "Hour:       \0" };
+        timeString = pvPortMalloc(sizeof(SPI_msg_t));
         timeString->LCD_to_be_clear = pdFALSE;
-        timeString->string = DateString;
+        timeString->string = HourString;
         xQueueSend(*pSPI_queue, &timeString, portMAX_DELAY);
-        vTaskDelay(pdMS_TO_TICKS(100));
 
-        /**date string is sent to the SPI screen*/
-        timeString = pvPortMalloc(sizeof(SPI_msg_t*));
+        printing_time_chars[9] = ' ';
+        printing_time_chars[10] = ' ';
+        printing_time_chars[11] = ' ';
+        /**hour string is sent to the SPI screen*/
+        timeString = pvPortMalloc(sizeof(SPI_msg_t));
         timeString->LCD_to_be_clear = pdFALSE;
         timeString->string = printing_time_chars;
         xQueueSend(*pSPI_queue, &timeString, portMAX_DELAY);
-        vTaskDelay(pdMS_TO_TICKS(100));
 
         /**spacing string is sent to the SPI screen*/
-        timeString = pvPortMalloc(sizeof(SPI_msg_t*));
+        uint8_t SpaceString[] = { "                \0" };
+        timeString = pvPortMalloc(sizeof(SPI_msg_t));
+        timeString->LCD_to_be_clear = pdFALSE;
+        timeString->string = SpaceString;
+        xQueueSend(*pSPI_queue, &timeString, portMAX_DELAY);
+
+        /**date message zone indicating message is sent to the SPI screen*/
+        uint8_t DateString[] = { "Date:       \0" };
+        timeString = pvPortMalloc(sizeof(SPI_msg_t));
+        timeString->LCD_to_be_clear = pdFALSE;
+        timeString->string = DateString;
+        xQueueSend(*pSPI_queue, &timeString, portMAX_DELAY);
+
+        /**date string is sent to the SPI screen*/
+        timeString = pvPortMalloc(sizeof(SPI_msg_t));
+        timeString->LCD_to_be_clear = pdFALSE;
+        timeString->string = printing_date_chars;
+        xQueueSend(*pSPI_queue, &timeString, portMAX_DELAY);
+
+        /**spacing string is sent to the SPI screen*/
+        timeString = pvPortMalloc(sizeof(SPI_msg_t));
         timeString->LCD_to_be_clear = pdFALSE;
         timeString->string = SpaceString;
         xQueueSend(*pSPI_queue, &timeString, portMAX_DELAY);

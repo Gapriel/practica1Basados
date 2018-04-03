@@ -119,7 +119,8 @@ int main(void) {
     UART_tasks((void*) p_UART_1_struct);
     xTaskCreate(TerminalMenus_MainMenu, "test menu 0", configMINIMAL_STACK_SIZE - 30 , (void*)p_UART_0_struct, 4 , NULL);
     xTaskCreate(TerminalMenus_MainMenu, "test menu 1", configMINIMAL_STACK_SIZE -30 , (void*)p_UART_1_struct, 4 , NULL);
-   vTaskStartScheduler();
+   // xTaskCreate(SPIReadHour, "SPI READ HOUR", configMINIMAL_STACK_SIZE, NULL, 3, NULL);
+    vTaskStartScheduler();
     while(1) {
 
     }
