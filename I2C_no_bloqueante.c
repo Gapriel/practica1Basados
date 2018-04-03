@@ -122,7 +122,7 @@ void I2CInit() {
     xSemaphoreGive(I2C_done);
 
     /* Initialize the Transfer task to be ready to transfer */
-    xTaskCreate(I2C_transfer, "I2C Transfer", configMINIMAL_STACK_SIZE, NULL, 5,
+    xTaskCreate(I2C_transfer, "I2C Transfer", configMINIMAL_STACK_SIZE, NULL, 4,
                 I2C_Transfer);
     /* Not needed anymore because it's just for configuration.*/
     vTaskDelete(NULL);

@@ -315,52 +315,52 @@ void CreateMenuTask(uart_struct* uart_struct, uint8_t menuToBeCreated)
         case ReadMemoryI2C:
             xTaskCreate(TerminalMenus_ReadMemory, "Read Memory Menu",
             configMINIMAL_STACK_SIZE + 20,
-                        (void*) uart_struct, 3, NULL);
+                        (void*) uart_struct, 2, NULL);
 
         break;
         case WriteMemoryI2C:
             xTaskCreate(TerminalMenus_WriteMemory, "Write memory menu",
             configMINIMAL_STACK_SIZE + 50,
-                        (void*) uart_struct, 3, NULL);
+                        (void*) uart_struct, 2, NULL);
 
         break;
         case StablishHour:
             xTaskCreate(TerminalMenus_EstablishRTCHour, "Establish hour menu",
             configMINIMAL_STACK_SIZE + 20,
-                        (void*) uart_struct, 3, NULL);
+                        (void*) uart_struct, 2, NULL);
 
         break;
         case StablishDate:
             xTaskCreate(TerminalMenus_EstablishRTCDate, "Establish date menu",
             configMINIMAL_STACK_SIZE + 20,
-                        (void*) uart_struct, 3, NULL);
+                        (void*) uart_struct, 2, NULL);
 
         break;
         case TimeFormat:
             xTaskCreate(TerminalMenus_EstablishRTCHourFormat,
                         "Establish time format menu", configMINIMAL_STACK_SIZE,
-                        (void*) uart_struct, 3, NULL);
+                        (void*) uart_struct, 2, NULL);
         break;
         case ReadHour:
             xTaskCreate(TerminalMenus_ReadRTCHour, "Read hour menu",
             configMINIMAL_STACK_SIZE + 20,
-                        (void*) uart_struct, 3, NULL);
+                        (void*) uart_struct, 2, NULL);
         break;
         case ReadDate:
             xTaskCreate(TerminalMenus_ReadRTCDate, "read date menu",
             configMINIMAL_STACK_SIZE + 10,
-                        (void*) uart_struct, 3, NULL);
+                        (void*) uart_struct, 2, NULL);
         break;
         case Terminal2Communication:
             xTaskCreate(TerminalMenus_TerminalsCommunication,
                         "terminals communication menu",
                         configMINIMAL_STACK_SIZE + 50,
-                        (void*) uart_struct, 3, NULL);
+                        (void*) uart_struct, 2, NULL);
         break;
         case LCDEcho:
             xTaskCreate(TerminalMenus_LCDEcho, "LCD echo menu",
             configMINIMAL_STACK_SIZE,
-                        (void*) uart_struct, 3, NULL);
+                        (void*) uart_struct, 2, NULL);
         break;
         default:
         break;
@@ -936,6 +936,7 @@ void TerminalMenus_ReadRTCHour(void* args) {
     pdFALSE, { pdTRUE, pdTRUE, pdTRUE }, { { { "\033[11;10H" } } }, //struct with constant position reference used in memory read menu
         { 0, 0 } };
     volatile uart_transfer_t* received_UART = NULL;
+
     UpdateValueByButtons_Events = xEventGroupCreate();
     for (;;)
     {
@@ -1164,6 +1165,8 @@ void TerminalMenus_ReadRTCDate(void* args)
     LineMovementPack_t LineMover = { 0, 0, 1,
     pdFALSE, { pdTRUE, pdTRUE, pdTRUE }, { { { "\033[12;10H" } } }, //struct with constant position reference used in memory read menu
         { 0, 0 } };
+
+    UpdateValueByButtons_Events = xEventGroupCreate();
     for (;;)
     {
 
