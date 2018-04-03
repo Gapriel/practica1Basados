@@ -66,6 +66,10 @@ QueueHandle_t UART1_receive_Queue;
 uart_handle_t g_uart1Handle;
 EventGroupHandle_t g_UART1_Events;
 
+TaskHandle_t SPI_Task_Handler;
+
+
+
 chatStates_t TerminalChatStates = {
     {pdFALSE,pdFALSE},
     {"\033[12;10H\0"},
@@ -117,9 +121,9 @@ int main(void) {
     UART_tasks((void*) p_UART_0_struct);
     SYSconfig_UARTConfiguration(p_UART_1_struct);
     UART_tasks((void*) p_UART_1_struct);
-    xTaskCreate(TerminalMenus_MainMenu, "test menu 0", configMINIMAL_STACK_SIZE - 30 , (void*)p_UART_0_struct, 2 , NULL);
+    xTaskCreate(TerminalMenus_MainMenu, "test menu 0", configMINIMAL_STACK_SIZE - 30 , (void*)p_UART_0_struct,2 , NULL);
     xTaskCreate(TerminalMenus_MainMenu, "test menu 1", configMINIMAL_STACK_SIZE -30 , (void*)p_UART_1_struct, 2 , NULL);
-   // xTaskCreate(SPIReadHour, "SPI READ HOUR", configMINIMAL_STACK_SIZE, NULL, 3, NULL);
+   xTaskCreate(SPIReadHour, "SPI READ HOUR", configMINIMAL_STACK_SIZE+25, NULL,1, &SPI_Task_Handler);
     vTaskStartScheduler();
     while(1) {
 
