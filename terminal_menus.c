@@ -376,14 +376,26 @@ void CheckIfReturnToMenu(uart_struct* uart_struct, uint8_t receivedChar,
         xTaskCreate(TerminalMenus_MainMenu, "menuu task",
         configMINIMAL_STACK_SIZE,
                     (void*) uart_struct, 3, NULL); //create menu task
-        if (MEMORY_TASK == type)
-        {
-            xEventGroupSetBits(SubTasks_Events, FREE_MEM_EVENT);
-        } else if (RTC_TASK == type)
-        {
+       switch(type){
+           case MEMORY_TASK:
+               xEventGroupSetBits(SubTasks_Events, FREE_MEM_EVENT);
+               break;
+           case RTC_TASK:
+               xEventGroupSetBits(SubTasks_Events, FREE_RTC_EVENT);
+               break;
+           case SPI_TASK:
+               xEventGroupSetBits(SubTasks_Events, LCD_BUSY);
+               break;
+       }
 
-            xEventGroupSetBits(SubTasks_Events, FREE_RTC_EVENT);
-        }
+//        if (MEMORY_TASK == type)
+//        {
+//            xEventGroupSetBits(SubTasks_Events, FREE_MEM_EVENT);
+//        } else if (RTC_TASK == type)
+//        {
+//
+//            xEventGroupSetBits(SubTasks_Events, FREE_RTC_EVENT);
+//        }
         vTaskDelete(NULL);  //deletes current task
     }
 }
@@ -473,6 +485,7 @@ uint16_t ASCII_TO_uint8_t(uint8_t fifo_number, uint8_t fifo_pops)
 //////////////////////////////////////////MENUS FUNCTIONS BODIES////////////////////////////////////////////
 void TerminalMenus_MainMenu(void* args)
 {
+    xEventGroupSetBits(SubTasks_Events, LCD_BUSY);
     pI2C_write_queue = pGetI2CHandler(); /**obtain of the i2c queue*/
     pSPI_queue = pGetSPIHandler(); /**obtain of the spi queue*/
     pI2C_done = pGetI2Mutex();/**obtain the status of the i2c mutex*/
@@ -1777,7 +1790,7 @@ void TerminalMenus_TerminalsCommunication(void* args)
 
 void TerminalMenus_LCDEcho(void* args)
 {
-
+    xEventGroupClearBits(SubTasks_Events, LCD_BUSY);
     uart_struct* UART_struct = (uart_struct*) args; /**local copy of the received uart struct passed by reference*/
     SPI_msg_t *charToBeMirrored; /**spi message declared to be sent to the SPI screen*/
     uint8_t firstEntryToMenu = pdFALSE; /**flag used to know if its the first time that the current task enters the superloop*/
@@ -1832,6 +1845,7 @@ void TerminalMenus_LCDEcho(void* args)
 
 void SPIReadHour(void * args)
 {
+    xEventGroupWaitBits(SubTasks_Events, LCD_BUSY, pdFALSE, pdTRUE, portMAX_DELAY);
     TickType_t xLastWakeTime; /**variable used to know when was the last wake time*/
     const TickType_t xPeriod = pdMS_TO_TICKS(1000); /**the task period will be of 1s*/
     volatile int8_t time_buffer_variable[3]; /**rtc time reading buffer*/
